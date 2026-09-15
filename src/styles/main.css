@@ -1,0 +1,127 @@
+/* ================= 传信纸船 · 过客/吾志风格设计系统 ================= */
+:root {
+  --paper-bg: #f3ede0;          /* 米黄纸底 */
+  --paper-card: #fffdf6;        /* 卡片纸面 */
+  --paper-deep: #efe6d3;        /* 深一度的纸 */
+  --ink: #43392e;               /* 墨色正文 */
+  --ink-soft: #8d8172;          /* 灰褐辅助 */
+  --ink-faint: #b8ac99;         /* 更浅 */
+  --line: #e7dcc6;              /* 纸纹分割线 */
+  --accent: #b3574d;            /* 朱砂红 */
+  --accent-soft: #f7e8e2;
+  --gold: #b98a3e;              /* 铜钱金 */
+  --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+}
+
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background-color: var(--paper-bg);
+  color: var(--ink);
+}
+* { box-sizing: border-box; }
+
+/* ---- 纸张卡片 ---- */
+.paper-card {
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 2px 10px rgba(140, 116, 80, 0.08);
+}
+
+/* ---- 分段选择器(吾志式) ---- */
+.seg {
+  display: inline-flex;
+  background: var(--paper-deep);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg .seg-item {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.seg .seg-item.on {
+  background: var(--paper-card);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(140, 116, 80, 0.18);
+}
+
+/* ---- 可选小圆片(心情/天气/邮票) ---- */
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  border: 1px solid var(--line);
+  background: var(--paper-card);
+  color: var(--ink-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+}
+.chip.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---- 信纸文本域(横线纸) ---- */
+.paper-textarea textarea {
+  background: repeating-linear-gradient(
+      to bottom,
+      transparent 0, transparent 27px,
+      var(--line) 27px, var(--line) 28px
+    ),
+    var(--paper-card) !important;
+  background-attachment: local;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 28px;
+  color: var(--ink);
+  border: 1px solid var(--line) !important;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+/* ---- 通用标题 ---- */
+.poetic-title {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+.poetic-sub {
+  font-family: var(--serif);
+  color: var(--ink-faint);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+/* ---- Element Plus 轻度融入主题 ---- */
+.el-button--primary {
+  --el-button-bg-color: var(--accent);
+  --el-button-border-color: var(--accent);
+  --el-button-hover-bg-color: #c96a5f;
+  --el-button-hover-border-color: #c96a5f;
+  border-radius: 999px;
+}
+.el-button { border-radius: 999px; }
+.el-dialog { border-radius: 16px; }
+.el-dialog__title { font-family: var(--serif); color: var(--ink); }
+.el-tabs__item.is-active { color: var(--accent); }
+.el-tabs__active-bar { background-color: var(--accent); }
+.el-tabs__item:hover { color: var(--accent); }
+.el-tag { border-radius: 999px; }
