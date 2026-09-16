@@ -12,7 +12,7 @@
         </div>
         <div class="env-meta">
           <div class="env-title">{{ letter.title || '(无标题)' }}</div>
-          <div class="env-line">{{ letter.senderName }} → {{ letter.receiverName }}</div>
+          <div class="env-line">{{ letter.senderName }} → {{ letter.receiverName || letter.receiverAddress || '收件地址待填' }}</div>
           <div class="env-line faint">{{ letter.sendTime || '尚未寄出' }}<template v-if="letter.readTime"> · 读于 {{ letter.readTime }}</template></div>
           <div v-if="letter.stampName || letter.envelopeName" class="env-line faint">
             <template v-if="letter.stampName">邮票「{{ letter.stampName }}」</template>
@@ -23,7 +23,7 @@
 
       <!-- 信纸正文 -->
       <div class="letter-paper">
-        <div class="salutation">致 {{ letter.receiverName }}：</div>
+        <div class="salutation">致 {{ letter.receiverName || letter.receiverAddress || '远方的朋友' }}：</div>
         <div class="letter-content">{{ letter.content }}</div>
         <div class="signature">—— {{ letter.senderName }}</div>
       </div>
@@ -74,8 +74,8 @@ onMounted(async () => {
 .env-stamp {
   width: 42px;
   height: 48px;
-  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 4px, #fdf4ee 4px 8px);
-  border: 1px dashed #d9a79f;
+  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 4px, var(--paper-warm) 4px 8px);
+  border: 1px dashed var(--soft-border);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -87,7 +87,7 @@ onMounted(async () => {
   color: var(--accent);
   font-weight: 700;
   font-size: 16px;
-  border: 1px solid #d9a79f;
+  border: 1px solid var(--soft-border);
   border-radius: 3px;
   width: 26px;
   height: 26px;

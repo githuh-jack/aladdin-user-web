@@ -22,7 +22,11 @@
 
     <!-- 统计 -->
     <div class="stat-row">
-      <div class="stat-item paper-card">
+      <div class="stat-item paper-card" title="管理好友" style="cursor: pointer" @click="openFriends">
+        <div class="stat-num">{{ friendCount }}</div>
+        <div class="stat-label">好友</div>
+      </div>
+      <div class="stat-item paper-card" title="查看邮票收藏进度" style="cursor: pointer" @click="openCollection">
         <div class="stat-num">{{ myStamps.length }}</div>
         <div class="stat-label">邮票种类</div>
       </div>
@@ -109,6 +113,23 @@
       <div v-if="!orders.length" class="empty-poem">暂无订单。</div>
     </div>
 
+    <!-- 好友管理 -->
+    <el-dialog v-model="friendsVisible" title="我的好友" width="94%" style="max-width: 760px">
+      <Friends />
+    </el-dialog>
+
+    <!-- 邮票收藏进度 -->
+    <el-dialog v-model="collectionVisible" title="邮票收藏进度" width="92%" style="max-width: 480px">
+      <template v-if="collectionList.length">
+        <div v-for="c in collectionList" :key="c.theme" class="collection-row">
+          <span class="collection-theme">{{ c.theme }}</span>
+          <el-progress class="collection-bar" :percentage="collectionPct(c)" :stroke-width="8" :show-text="false" />
+          <span class="collection-num">{{ c.collected }}/{{ c.total }}</span>
+        </div>
+      </template>
+      <div v-else class="empty-poem">还没有收藏任何邮票，去商店挑一枚吧。</div>
+    </el-dialog>
+
     <!-- 退出 -->
     <div class="logout-row">
       <el-button round @click="logout">退出登录</el-button>
@@ -121,7 +142,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { coinApi, stampApi, envelopeApi } from '@/api'
+import { coinApi, stampApi, envelopeApi, friendApi } from '@/api'
+import Friends from './Friends.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -134,6 +156,35 @@ const myStamps = ref([])
 const myEnvelopes = ref([])
 const orders = ref([])
 const logs = ref([])
+
+// 好友管理(点击"好友"卡片查看)
+const friendsVisible = ref(false)
+const friendCount = ref(0)
+
+const openFriends = () => { friendsVisible.value = true }
+const loadFriendCount = async () => {
+  try {
+    const r = await friendApi.list()
+    friendCount.value = (r.data || []).length
+  } catch (e) { /* ignore */ }
+}
+
+// 邮票收藏进度(点击"邮票种类"卡片查看)
+const collectionVisible = ref(false)
+const collectionList = ref([])
+
+const openCollection = async () => {
+  collectionVisible.value = true
+  try {
+    const r = await stampApi.collection()
+    collectionList.value = r.data || []
+  } catch (e) { /* ignore */ }
+}
+
+const collectionPct = (c) => {
+  if (!c.total) return 0
+  return Math.min(100, Math.round(((c.collected || 0) / c.total) * 100))
+}
 
 const loadAll = async () => {
   loading.value = true
@@ -150,6 +201,7 @@ const loadAll = async () => {
     myEnvelopes.value = e.data || []
     orders.value = o.data || []
     logs.value = l.data?.items || l.data || []
+    loadFriendCount()
   } finally { loading.value = false }
 }
 
@@ -191,7 +243,7 @@ onMounted(loadAll)
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
-  border: 2px solid #e8cfc7;
+  border: 2px solid var(--soft-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -205,8 +257,8 @@ onMounted(loadAll)
 .role-chip {
   font-size: 10px;
   color: var(--gold);
-  border: 1px solid #e3d2ac;
-  background: #fbf3e3;
+  border: 1px solid var(--soft-border);
+  background: var(--paper-warm);
   border-radius: 999px;
   padding: 2px 10px;
 }
@@ -249,8 +301,8 @@ onMounted(loadAll)
 .goods-stamp {
   width: 56px;
   height: 64px;
-  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 4px, #fdf4ee 4px 8px);
-  border: 1px dashed #d9a79f;
+  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 4px, var(--paper-warm) 4px 8px);
+  border: 1px dashed var(--soft-border);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -262,7 +314,7 @@ onMounted(loadAll)
   color: var(--accent);
   font-weight: 700;
   font-size: 14px;
-  border: 1px solid #d9a79f;
+  border: 1px solid var(--soft-border);
   border-radius: 3px;
   width: 36px;
   height: 36px;
@@ -309,7 +361,7 @@ onMounted(loadAll)
 .order-type {
   font-size: 10px;
   color: var(--accent);
-  border: 1px solid #e0b9b2;
+  border: 1px solid var(--soft-border);
   background: var(--accent-soft);
   border-radius: 999px;
   padding: 1px 8px;
@@ -320,6 +372,21 @@ onMounted(loadAll)
 .order-time { font-size: 11px; color: var(--ink-faint); }
 
 .empty-poem { text-align: center; font-family: var(--serif); color: var(--ink-faint); font-size: 13px; padding: 40px 0; letter-spacing: 1px; grid-column: 1 / -1; }
+
+.collection-row { display: flex; align-items: center; gap: 10px; }
+.collection-row + .collection-row { margin-top: 10px; }
+.collection-theme {
+  font-size: 12px;
+  color: var(--ink-soft);
+  width: 76px;
+  flex-shrink: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.collection-bar { flex: 1; }
+.collection-num { font-family: var(--serif); font-size: 12px; color: var(--ink-faint); width: 52px; flex-shrink: 0; text-align: right; }
 
 .logout-row { text-align: center; margin-top: 24px; }
 </style>

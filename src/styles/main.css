@@ -3,14 +3,75 @@
   --paper-bg: #f3ede0;          /* 米黄纸底 */
   --paper-card: #fffdf6;        /* 卡片纸面 */
   --paper-deep: #efe6d3;        /* 深一度的纸 */
+  --paper-warm: #fbf3e3;        /* 暖色纸面(徽标/币区) */
   --ink: #43392e;               /* 墨色正文 */
   --ink-soft: #8d8172;          /* 灰褐辅助 */
   --ink-faint: #b8ac99;         /* 更浅 */
   --line: #e7dcc6;              /* 纸纹分割线 */
+  --soft-border: #e8cfc7;       /* 浅色描边(头像/徽章) */
   --accent: #b3574d;            /* 朱砂红 */
   --accent-soft: #f7e8e2;
+  --accent-hover: #c96a5f;
   --gold: #b98a3e;              /* 铜钱金 */
   --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+}
+
+/* ================= 用户可选主题色板(整体视觉) ================= */
+html[data-theme="celadon"] {   /* 青瓷 */
+  --paper-bg: #edf2ec;
+  --paper-card: #fbfdf9;
+  --paper-deep: #e3ece4;
+  --paper-warm: #eef6ef;
+  --ink: #2f3a33;
+  --ink-soft: #71827a;
+  --ink-faint: #9fb0a6;
+  --line: #d8e4d9;
+  --soft-border: #c5d9cb;
+  --accent: #4e8d7c;
+  --accent-soft: #e3f1ec;
+  --accent-hover: #62a390;
+}
+html[data-theme="indigo"] {    /* 黛蓝 */
+  --paper-bg: #eef0f5;
+  --paper-card: #fcfcfe;
+  --paper-deep: #e4e7f0;
+  --paper-warm: #eff2f9;
+  --ink: #2e3340;
+  --ink-soft: #6f7688;
+  --ink-faint: #9aa1b2;
+  --line: #dbe0ea;
+  --soft-border: #c8d0e2;
+  --accent: #5b6d9e;
+  --accent-soft: #e7ebf6;
+  --accent-hover: #6f81b2;
+}
+html[data-theme="sakura"] {    /* 绯樱 */
+  --paper-bg: #f5eef0;
+  --paper-card: #fffcfc;
+  --paper-deep: #f0e3e7;
+  --paper-warm: #faf0f3;
+  --ink: #40323a;
+  --ink-soft: #8a7680;
+  --ink-faint: #b5a0aa;
+  --line: #e8d9de;
+  --soft-border: #e3c3ce;
+  --accent: #c26583;
+  --accent-soft: #f9e9ef;
+  --accent-hover: #d47a95;
+}
+html[data-theme="ink"] {       /* 黛墨 */
+  --paper-bg: #efedea;
+  --paper-card: #fcfbf9;
+  --paper-deep: #e6e3de;
+  --paper-warm: #f3f0eb;
+  --ink: #33302b;
+  --ink-soft: #75716a;
+  --ink-faint: #a5a19a;
+  --line: #e0dcd5;
+  --soft-border: #d0cabf;
+  --accent: #6b6357;
+  --accent-soft: #efeae1;
+  --accent-hover: #7f776a;
 }
 
 html, body, #app {
@@ -114,8 +175,8 @@ html, body, #app {
 .el-button--primary {
   --el-button-bg-color: var(--accent);
   --el-button-border-color: var(--accent);
-  --el-button-hover-bg-color: #c96a5f;
-  --el-button-hover-border-color: #c96a5f;
+  --el-button-hover-bg-color: var(--accent-hover);
+  --el-button-hover-border-color: var(--accent-hover);
   border-radius: 999px;
 }
 .el-button { border-radius: 999px; }

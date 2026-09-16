@@ -1,11 +1,11 @@
 <template>
   <div>
     <div class="head-row">
-      <span class="poetic-title">感想</span>
+      <span class="poetic-title">随记</span>
       <div class="head-actions">
-        <el-button v-if="activeTab === 'mine'" round type="primary" size="small" @click="openDialog()">写感想</el-button>
+        <el-button v-if="!isGuest && activeTab === 'mine'" round type="primary" size="small" @click="openDialog()">写随记</el-button>
         <div class="seg">
-          <button class="seg-item" :class="{ on: activeTab === 'mine' }" @click="switchTab('mine')">我的</button>
+          <button v-if="!isGuest" class="seg-item" :class="{ on: activeTab === 'mine' }" @click="switchTab('mine')">我的</button>
           <button class="seg-item" :class="{ on: activeTab === 'public' }" @click="switchTab('public')">广场</button>
         </div>
       </div>
@@ -16,7 +16,7 @@
         <div class="item-head">
           <span class="item-type">{{ t.thoughtType || '随笔' }}</span>
           <span v-if="t.isPublic === 1" class="item-public">公开</span>
-          <span class="item-actions" v-if="activeTab === 'mine'">
+          <span class="item-actions" v-if="!isGuest && activeTab === 'mine'">
             <el-icon @click.stop="openDialog(t)"><EditPen /></el-icon>
             <el-icon @click.stop="remove(t.id)"><Delete /></el-icon>
           </span>
@@ -26,13 +26,40 @@
         <div class="item-meta">
           {{ activeTab === 'mine' ? t.sys001 : (t.userName || '') }}
         </div>
+        <div class="card-foot" @click.stop>
+          <button class="foot-btn" :class="{ on: t.liked }" @click="toggleInteract(t, 'like')">
+            <span class="foot-icon">♥</span>
+            <span>{{ t.likeCount || 0 }}</span>
+          </button>
+          <button class="foot-btn star" :class="{ on: t.faved }" @click="toggleInteract(t, 'fav')">
+            <span class="foot-icon">★</span>
+            <span>{{ t.favCount || 0 }}</span>
+          </button>
+          <button class="foot-btn" :class="{ on: expandedId === t.id }" @click="toggleComments(t)">
+            <span>评论</span>
+            <span>{{ t.commentCount || 0 }}</span>
+          </button>
+        </div>
+        <div v-if="expandedId === t.id" class="comment-panel" @click.stop>
+          <div v-loading="commentLoading" class="comment-list">
+            <div v-for="c in comments" :key="c.id" class="comment-item">
+              <div class="comment-main"><span class="comment-name">{{ c.userName }}</span>{{ c.content }}</div>
+              <div class="comment-time">{{ (c.sys001 || '').slice(0, 16) }}</div>
+            </div>
+            <div v-if="!commentLoading && !comments.length" class="comment-empty">还没有回信。</div>
+          </div>
+          <div class="comment-input-row">
+            <el-input v-model="commentText" size="small" maxlength="200" placeholder="写点什么回应…" class="comment-input" @keyup.enter="sendComment(t)" />
+            <el-button size="small" round type="primary" @click="sendComment(t)">发送</el-button>
+          </div>
+        </div>
       </div>
       <div v-if="!loading && !list.length" class="empty-poem">
-        {{ activeTab === 'mine' ? '还没有感想，从一句话开始。' : '广场还很安静。' }}
+        {{ activeTab === 'mine' ? '还没有随记，从一句话开始。' : '广场还很安静。' }}
       </div>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="editing.id ? '编辑感想' : '写感想'" width="92%" style="max-width: 560px">
+    <el-dialog v-model="dialogVisible" :title="editing.id ? '编辑随记' : '写随记'" width="92%" style="max-width: 560px">
       <el-input v-model="editing.title" placeholder="标题" maxlength="50" class="dlg-title-input" borderless />
       <div class="dlg-label">类型</div>
       <div class="chip-row">
@@ -64,12 +91,24 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, EditPen } from '@element-plus/icons-vue'
-import { thoughtApi } from '@/api'
+import { thoughtApi, interactApi, commentApi } from '@/api'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
-const activeTab = ref('mine')
+const router = useRouter()
+const userStore = useUserStore()
+const isGuest = computed(() => !userStore.token)
+
+// 游客交互前先登录
+const requireLogin = () => {
+  ElMessage.warning('请先登录')
+  router.push('/login?redirect=' + encodeURIComponent(location.pathname + location.search))
+}
+
+const activeTab = ref(!useUserStore().token ? 'public' : 'mine')
 const list = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
@@ -120,6 +159,42 @@ const viewDetail = (row) => {
   detailVisible.value = true
 }
 
+const toggleInteract = async (t, action) => {
+  if (isGuest.value) { requireLogin(); return }
+  const r = await interactApi.toggle({ targetType: 'thought', targetId: t.id, action })
+  const d = r.data || {}
+  if (action === 'like') { t.liked = d.active; t.likeCount = d.count }
+  else { t.faved = d.active; t.favCount = d.count }
+}
+
+const expandedId = ref(null)
+const comments = ref([])
+const commentLoading = ref(false)
+const commentText = ref('')
+
+const toggleComments = async (t) => {
+  if (expandedId.value === t.id) { expandedId.value = null; return }
+  expandedId.value = t.id
+  commentText.value = ''
+  comments.value = []
+  commentLoading.value = true
+  try {
+    const r = await commentApi.list({ targetType: 'thought', targetId: t.id })
+    comments.value = r.data || []
+  } finally { commentLoading.value = false }
+}
+
+const sendComment = async (t) => {
+  if (isGuest.value) { requireLogin(); return }
+  const content = (commentText.value || '').trim()
+  if (!content) return
+  await commentApi.add({ targetType: 'thought', targetId: t.id, content })
+  commentText.value = ''
+  t.commentCount = (t.commentCount || 0) + 1
+  const r = await commentApi.list({ targetType: 'thought', targetId: t.id })
+  comments.value = r.data || []
+}
+
 watch(activeTab, load)
 onMounted(load)
 </script>
@@ -132,7 +207,7 @@ onMounted(load)
 .item-type {
   font-size: 10px;
   color: var(--accent);
-  border: 1px solid #e0b9b2;
+  border: 1px solid var(--soft-border);
   background: var(--accent-soft);
   border-radius: 999px;
   padding: 1px 8px;
@@ -140,7 +215,7 @@ onMounted(load)
 .item-public {
   font-size: 10px;
   color: var(--gold);
-  border: 1px solid #e3d2ac;
+  border: 1px solid var(--soft-border);
   border-radius: 999px;
   padding: 1px 8px;
 }
@@ -157,6 +232,29 @@ onMounted(load)
   overflow: hidden;
 }
 .item-meta { font-size: 11px; color: var(--ink-faint); margin-top: 8px; }
+.card-foot {
+  display: flex; align-items: center; gap: 18px;
+  margin-top: 10px; padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.foot-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--ink-faint);
+  transition: color .2s;
+}
+.foot-btn:hover { color: var(--ink-soft); }
+.foot-btn.on { color: var(--accent); }
+.foot-btn.star.on { color: var(--gold); }
+.comment-panel { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.comment-item { padding: 6px 0; border-bottom: 1px dotted var(--line); }
+.comment-item:last-child { border-bottom: none; }
+.comment-main { font-size: 12px; color: var(--ink); line-height: 20px; word-break: break-word; }
+.comment-name { color: var(--accent); margin-right: 8px; }
+.comment-time { font-size: 10px; color: var(--ink-faint); margin-top: 2px; }
+.comment-empty { font-size: 12px; color: var(--ink-faint); padding: 8px 0; }
+.comment-input-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.comment-input { flex: 1; }
 .dlg-title-input :deep(.el-input__inner) { font-family: var(--serif); font-size: 16px; font-weight: 600; }
 .dlg-label { font-size: 12px; color: var(--ink-faint); margin: 14px 0 8px; }
 .dlg-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; font-size: 13px; color: var(--ink-soft); }

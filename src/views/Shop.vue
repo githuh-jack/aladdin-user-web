@@ -16,12 +16,16 @@
 
     <div v-loading="loading">
       <!-- 邮票商店 -->
-      <div v-if="activeTab === 'stampShop'" class="goods-grid">
+      <div v-if="activeTab === 'stampShop'">
+        <!-- 集市在售 -->
+        <div class="block-head"><span class="poetic-title" style="font-size: 16px">集市在售</span></div>
+        <div class="goods-grid">
         <div v-for="item in stampShopList" :key="item.id" class="paper-card goods-card">
           <div class="goods-stamp">
             <span class="goods-stamp-inner">{{ item.name?.slice(0, 2) || '邮' }}</span>
           </div>
           <div class="goods-name">{{ item.name }}</div>
+          <div v-if="item.theme" class="theme-chip">{{ item.theme }}</div>
           <div class="goods-desc">{{ item.description || '—' }}</div>
           <div class="goods-tag">{{ item.stampType || '普通' }}</div>
           <div class="goods-bottom">
@@ -38,6 +42,7 @@
           </div>
         </div>
         <div v-if="!loading && !stampShopList.length" class="empty-poem">暂无上架邮票。</div>
+        </div>
       </div>
 
       <!-- 信封商店 -->
@@ -124,8 +129,9 @@ const buy = async (itemType, item) => {
     await shopApi.buy({ itemType, itemId: item.id, quantity })
     ElMessage.success('购买成功')
     await loadBalance()
-    if (activeTab.value === 'stampShop') loadStampShop()
-    else loadEnvelopeShop()
+    if (activeTab.value === 'stampShop') {
+      loadStampShop()
+    } else loadEnvelopeShop()
   } catch (e) { /* error handled by interceptor */ }
 }
 
@@ -141,7 +147,7 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: linear-gradient(135deg, #f5e6c5, #ecd5a0);
+  background: linear-gradient(135deg, var(--paper-warm), var(--paper-deep));
   border: 1px solid #e0c486;
   color: #7a5b1f;
   border-radius: 999px;
@@ -168,8 +174,8 @@ onMounted(async () => {
 .goods-stamp {
   width: 56px;
   height: 64px;
-  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 4px, #fdf4ee 4px 8px);
-  border: 1px dashed #d9a79f;
+  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 4px, var(--paper-warm) 4px 8px);
+  border: 1px dashed var(--soft-border);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -181,7 +187,7 @@ onMounted(async () => {
   color: var(--accent);
   font-weight: 700;
   font-size: 14px;
-  border: 1px solid #d9a79f;
+  border: 1px solid var(--soft-border);
   border-radius: 3px;
   width: 36px;
   height: 36px;
@@ -207,15 +213,26 @@ onMounted(async () => {
 .goods-tag {
   font-size: 10px;
   color: var(--gold);
-  border: 1px solid #e3d2ac;
+  border: 1px solid var(--soft-border);
   border-radius: 999px;
   padding: 1px 8px;
   margin: 6px 0;
 }
 .goods-bottom { display: flex; align-items: baseline; justify-content: space-between; width: 100%; margin-top: 4px; }
-.goods-price { font-family: var(--serif); font-weight: 700; color: #b98a3e; font-size: 15px; }
+.goods-price { font-family: var(--serif); font-weight: 700; color: var(--gold); font-size: 15px; }
 .goods-price small { font-size: 10px; color: var(--ink-faint); font-weight: normal; }
 .goods-stock { font-size: 11px; color: var(--ink-faint); }
 .goods-actions { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .empty-poem { text-align: center; font-family: var(--serif); color: var(--ink-faint); font-size: 13px; padding: 50px 0; letter-spacing: 1px; grid-column: 1 / -1; }
+
+.block-head { margin: 20px 0 10px; }
+.theme-chip {
+  font-size: 10px;
+  color: var(--accent);
+  border: 1px solid var(--soft-border);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin: 4px 0 2px;
+}
 </style>

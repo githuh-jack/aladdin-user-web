@@ -20,7 +20,7 @@
         <div class="nav-inner">
           <div class="nav-brand" @click="go('/home')">
             <svg class="boat" viewBox="0 0 24 24" width="22" height="22">
-              <path d="M3 15c3 2 15 2 18 0l-2.5 4.5c-.4.8-1.2 1.2-2 1.2h-9c-.8 0-1.6-.4-2-1.2L3 15z" fill="#b3574d"/>
+              <path d="M3 15c3 2 15 2 18 0l-2.5 4.5c-.4.8-1.2 1.2-2 1.2h-9c-.8 0-1.6-.4-2-1.2L3 15z" class="boat-hull"/>
               <path d="M12 3l4 10H8L12 3z" fill="#b98a3e"/>
             </svg>
             <span class="brand-name">传信纸船</span>
@@ -33,16 +33,40 @@
           </nav>
 
           <div class="nav-right">
-            <el-button round type="primary" size="small" @click="go('/letters/write')">✎ 写信</el-button>
-            <el-dropdown trigger="click" @command="onCommand">
-              <div class="avatar">{{ avatarChar }}</div>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-                  <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
-                </el-dropdown-menu>
+            <el-popover placement="bottom" :width="176" trigger="click">
+              <template #reference>
+                <div class="theme-btn" title="主题颜色">
+                  <span class="theme-dot" :style="{ background: currentThemeColor }"></span>
+                </div>
               </template>
-            </el-dropdown>
+              <div class="theme-panel">
+                <div class="theme-panel-title">选个主题</div>
+                <div class="theme-opts">
+                  <div v-for="t in THEMES" :key="t.key" class="theme-opt" :class="{ on: currentTheme === t.key }"
+                       @click="pickTheme(t)">
+                    <span class="theme-dot" :style="{ background: t.color }"></span>
+                    <span class="theme-opt-name">{{ t.name }}</span>
+                    <span v-if="currentTheme === t.key" class="theme-opt-check">✓</span>
+                  </div>
+                </div>
+              </div>
+            </el-popover>
+            <el-button v-if="!isGuest" round type="primary" size="small" @click="go('/letters/write')">✎ 写信</el-button>
+            <template v-if="!isGuest">
+              <el-dropdown trigger="click" @command="onCommand">
+                <div class="avatar">{{ avatarChar }}</div>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+                    <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
+            <template v-else>
+              <el-button round size="small" @click="go('/register')">注册</el-button>
+              <el-button round type="primary" size="small" @click="go('/login')">登录</el-button>
+            </template>
           </div>
         </div>
       </header>
@@ -57,10 +81,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { THEMES, applyTheme, initTheme } from '@/utils/theme'
 
 const route = useRoute()
 const router = useRouter()
@@ -68,14 +93,14 @@ const userStore = useUserStore()
 
 const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 const avatarChar = computed(() => (userStore.realName || userStore.username || '客').slice(0, 1))
+const isGuest = computed(() => !userStore.token)
 
 const navMenus = [
   { path: '/home', title: '首页' },
   { path: '/letters', title: '信件' },
   { path: '/diary', title: '日记' },
-  { path: '/thoughts', title: '感想' },
-  { path: '/notes', title: '其他' },
-  { path: '/friends', title: '好友' },
+  { path: '/thoughts', title: '随记' },
+  { path: '/notes', title: '话题' },
   { path: '/shop', title: '商店' }
 ]
 
@@ -83,8 +108,8 @@ const adminMenus = [
   { path: '/admin/letters', title: '信件' },
   { path: '/admin/friends', title: '好友' },
   { path: '/admin/diary', title: '日记' },
-  { path: '/admin/thoughts', title: '感想' },
-  { path: '/admin/notes', title: '笔记' },
+  { path: '/admin/thoughts', title: '随记' },
+  { path: '/admin/notes', title: '话题' },
   { path: '/admin/stamps', title: '邮票' },
   { path: '/admin/envelopes', title: '信封' },
   { path: '/admin/coin', title: '铜钱' },
@@ -93,6 +118,15 @@ const adminMenus = [
 
 const isActive = (p) => route.path === p || route.path.startsWith(p + '/')
 const go = (p) => router.push(p)
+
+// 主题颜色
+const currentTheme = ref(initTheme())
+const currentThemeColor = computed(() =>
+  (THEMES.find(t => t.key === currentTheme.value) || THEMES[0]).color)
+const pickTheme = (t) => {
+  currentTheme.value = t.key
+  applyTheme(t.key)
+}
 
 const onCommand = (cmd) => {
   if (cmd === 'profile') router.push('/profile')
@@ -188,7 +222,7 @@ onMounted(async () => {
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
-  border: 1px solid #e8cfc7;
+  border: 1px solid var(--soft-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -196,6 +230,48 @@ onMounted(async () => {
   font-size: 15px;
   cursor: pointer;
 }
+
+/* ---------- 主题颜色选择 ---------- */
+.boat-hull { fill: var(--accent); }
+.theme-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.theme-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+.theme-panel-title {
+  font-family: var(--serif);
+  font-size: 13px;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+.theme-opts { display: flex; flex-direction: column; gap: 2px; }
+.theme-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.theme-opt:hover { background: var(--paper-deep); }
+.theme-opt.on { background: var(--accent-soft); }
+.theme-opt-name { font-size: 13px; color: var(--ink); }
+.theme-opt.on .theme-opt-name { color: var(--accent); font-weight: 600; }
+.theme-opt-check { margin-left: auto; font-size: 12px; color: var(--accent); }
 
 /* ---------- 内容区 ---------- */
 .web-main {

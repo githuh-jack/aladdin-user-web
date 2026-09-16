@@ -23,7 +23,7 @@ request.interceptors.response.use(
       if (res.code === 401 || res.code === 20001 || res.code === 20002 || res.code === 20003 || res.code === 20005) {
         const userStore = useUserStore()
         userStore.logout()
-        window.location.href = '/login'
+        window.location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search)
       }
       return Promise.reject(new Error(res.msg || 'Error'))
     }
@@ -33,7 +33,7 @@ request.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       const userStore = useUserStore()
       userStore.logout()
-      window.location.href = '/login'
+      window.location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search)
     }
     ElMessage.error(error.response?.data?.msg || error.message || '网络错误')
     return Promise.reject(error)
@@ -64,7 +64,10 @@ export const friendApi = {
   applies: () => request.get('/biz/friend/applies'),
   apply: (data) => request.post('/biz/friend/apply', data),
   handle: (id, data) => request.post(`/biz/friend/handle/${id}`, data),
-  remove: (id) => request.post(`/biz/friend/remove/${id}`)
+  remove: (id) => request.post(`/biz/friend/remove/${id}`),
+  blacklist: (targetId) => request.post(`/biz/friend/blacklist/${targetId}`),
+  unblacklist: (targetId) => request.post(`/biz/friend/unblacklist/${targetId}`),
+  blacklistList: () => request.get('/biz/friend/blacklist')
 }
 
 // 用户搜索(用于加好友)
@@ -106,7 +109,19 @@ export const noteApi = {
 export const stampApi = {
   shopList: () => request.get('/biz/stamp/shop'),
   mine: () => request.get('/biz/stamp/mine'),
-  detail: (id) => request.get(`/biz/stamp/detail/${id}`)
+  detail: (id) => request.get(`/biz/stamp/detail/${id}`),
+  collection: () => request.get('/biz/stamp/collection')
+}
+
+// 互动(点赞/收藏)
+export const interactApi = {
+  toggle: (data) => request.post('/biz/interact/toggle', data)
+}
+
+// 评论
+export const commentApi = {
+  list: (params) => request.get('/biz/comment/list', { params }),
+  add: (data) => request.post('/biz/comment', data)
 }
 
 // 信封

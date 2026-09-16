@@ -25,7 +25,7 @@
                 {{ item.senderName }} 寄给我的
               </template>
               <template v-else>
-                寄给 {{ item.receiverName }}
+                寄给 {{ item.receiverName || item.receiverAddress || '未指定收件人' }}
               </template>
               <el-tag v-if="item.status === 0" size="small" type="info" class="env-tag">草稿</el-tag>
               <el-tag v-else-if="activeTab === 'sent' && item.status === 2" size="small" type="success" class="env-tag">已读</el-tag>
@@ -107,8 +107,8 @@ onMounted(load)
 .env-stamp {
   width: 42px;
   height: 48px;
-  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 4px, #fdf4ee 4px 8px);
-  border: 1px dashed #d9a79f;
+  background: repeating-linear-gradient(45deg, var(--accent-soft) 0 4px, var(--paper-warm) 4px 8px);
+  border: 1px dashed var(--soft-border);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -120,7 +120,7 @@ onMounted(load)
   color: var(--accent);
   font-weight: 700;
   font-size: 16px;
-  border: 1px solid #d9a79f;
+  border: 1px solid var(--soft-border);
   border-radius: 3px;
   width: 26px;
   height: 26px;

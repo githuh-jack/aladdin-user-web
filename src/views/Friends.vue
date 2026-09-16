@@ -8,6 +8,7 @@
     <div class="seg" style="margin-bottom: 14px">
       <button class="seg-item" :class="{ on: activeTab === 'list' }" @click="switchTab('list')">我的好友</button>
       <button class="seg-item" :class="{ on: activeTab === 'applies' }" @click="switchTab('applies')">好友申请</button>
+      <button class="seg-item" :class="{ on: activeTab === 'blacklist' }" @click="switchTab('blacklist')">黑名单</button>
     </div>
 
     <div v-loading="loading">
@@ -20,13 +21,14 @@
             <div class="friend-since">{{ f.addTime ? `成为笔友于 ${f.addTime}` : '' }}</div>
           </div>
           <el-button round size="small" type="primary" plain @click="writeLetter(f)">写信</el-button>
+          <el-icon class="friend-del" title="拉黑" @click="black(f)"><Hide /></el-icon>
           <el-icon class="friend-del" @click="remove(f.id)"><Delete /></el-icon>
         </div>
         <div v-if="!loading && !list.length" class="empty-poem">还没有笔友，去添加一位吧。</div>
       </template>
 
       <!-- 好友申请 -->
-      <template v-else>
+      <template v-else-if="activeTab === 'applies'">
         <div v-for="a in list" :key="a.id" class="paper-card friend-card">
           <div class="friend-avatar">{{ (a.friendName || '客').slice(0, 1) }}</div>
           <div class="friend-info">
@@ -40,6 +42,23 @@
           </div>
         </div>
         <div v-if="!loading && !list.length" class="empty-poem">暂无申请。</div>
+      </template>
+
+      <!-- 黑名单 -->
+      <template v-else>
+        <div class="black-add">
+          <el-input v-model.number="blackId" placeholder="输入用户ID拉黑(可拉黑非好友)" style="max-width: 260px" clearable />
+          <el-button round type="primary" plain @click="blackById">拉黑</el-button>
+        </div>
+        <div v-for="b in list" :key="b.id" class="paper-card friend-card">
+          <div class="friend-avatar blocked">{{ (b.friendName || '客').slice(0, 1) }}</div>
+          <div class="friend-info">
+            <div class="friend-name">{{ b.friendName }}</div>
+            <div class="friend-since">已拉黑，无法收到 TA 的来信与申请</div>
+          </div>
+          <el-button round size="small" @click="unblack(b)">移出黑名单</el-button>
+        </div>
+        <div v-if="!loading && !list.length" class="empty-poem">黑名单空空如也。</div>
       </template>
     </div>
 
@@ -58,7 +77,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete } from '@element-plus/icons-vue'
+import { Delete, Hide } from '@element-plus/icons-vue'
 import { friendApi } from '@/api'
 
 const router = useRouter()
@@ -67,13 +86,16 @@ const list = ref([])
 const loading = ref(false)
 const applyDialog = ref(false)
 const applyForm = reactive({ friendId: null, remark: '' })
+const blackId = ref(null)
 
 const load = async () => {
   loading.value = true
   try {
     const r = activeTab.value === 'list'
       ? await friendApi.list()
-      : await friendApi.applies()
+      : activeTab.value === 'applies'
+        ? await friendApi.applies()
+        : await friendApi.blacklistList()
     list.value = r.data || []
   } finally { loading.value = false }
 }
@@ -93,6 +115,27 @@ const remove = async (id) => {
   await ElMessageBox.confirm('确定删除该好友？', '提示', { type: 'warning' })
   await friendApi.remove(id)
   ElMessage.success('已删除')
+  load()
+}
+
+const black = async (f) => {
+  await ElMessageBox.confirm(`确定拉黑 ${f.friendName}？拉黑后将收不到 TA 的来信与好友申请，且 TA 的好友列表中不再显示你。`, '拉黑确认', { type: 'warning' })
+  await friendApi.blacklist(f.friendId)
+  ElMessage.success('已拉黑')
+  load()
+}
+
+const blackById = async () => {
+  if (!blackId.value) { ElMessage.warning('请输入用户ID'); return }
+  await friendApi.blacklist(blackId.value)
+  ElMessage.success('已拉黑')
+  blackId.value = null
+  load()
+}
+
+const unblack = async (b) => {
+  await friendApi.unblacklist(b.friendId)
+  ElMessage.success('已移出黑名单')
   load()
 }
 
@@ -136,5 +179,12 @@ onMounted(load)
 .apply-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .friend-del { color: var(--ink-faint); cursor: pointer; }
 .friend-del:hover { color: var(--accent); }
+.black-add { display: flex; gap: 10px; margin-bottom: 14px; }
+.friend-avatar.blocked {
+  background: var(--ink-faint);
+  border-color: var(--ink-faint);
+  color: var(--paper-card);
+  opacity: 0.75;
+}
 .empty-poem { text-align: center; font-family: var(--serif); color: var(--ink-faint); font-size: 13px; padding: 50px 0; letter-spacing: 1px; }
 </style>

@@ -19,15 +19,14 @@ const routes = [
     component: () => import('@/views/Layout.vue'),
     redirect: '/home',
     children: [
-      { path: 'home', name: 'Home', component: () => import('@/views/Home.vue') },
+      { path: 'home', name: 'Home', component: () => import('@/views/Home.vue'), meta: { guest: true } },
       { path: 'letters', name: 'Letters', component: () => import('@/views/Letters.vue') },
       { path: 'letters/write', name: 'LetterWrite', component: () => import('@/views/LetterWrite.vue') },
       { path: 'letters/:id', name: 'LetterDetail', component: () => import('@/views/LetterDetail.vue') },
-      { path: 'friends', name: 'Friends', component: () => import('@/views/Friends.vue') },
       { path: 'diary', name: 'Diary', component: () => import('@/views/Diary.vue') },
       { path: 'diary/write', name: 'DiaryWrite', component: () => import('@/views/DiaryWrite.vue') },
-      { path: 'thoughts', name: 'Thoughts', component: () => import('@/views/Thoughts.vue') },
-      { path: 'notes', name: 'Notes', component: () => import('@/views/Notes.vue') },
+      { path: 'thoughts', name: 'Thoughts', component: () => import('@/views/Thoughts.vue'), meta: { guest: true } },
+      { path: 'notes', name: 'Notes', component: () => import('@/views/Notes.vue'), meta: { guest: true } },
       { path: 'shop', name: 'Shop', component: () => import('@/views/Shop.vue') },
       { path: 'profile', name: 'Profile', component: () => import('@/views/Profile.vue') },
       { path: 'admin/letters', name: 'AdminLetters', component: () => import('@/views/admin/Letters.vue'), meta: { requiresAdmin: true } },
@@ -51,8 +50,9 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
-  if (!userStore.token && !to.meta.public) {
-    next('/login')
+  // 游客可访问 public/guest 页面, 其余跳登录并记住来路
+  if (!userStore.token && !to.meta.public && !to.meta.guest) {
+    next('/login?redirect=' + encodeURIComponent(to.fullPath))
     return
   }
   if (userStore.token && !userStore.username) {

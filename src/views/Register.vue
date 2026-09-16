@@ -3,7 +3,7 @@
     <div class="register-paper">
       <div class="boat-mark">
         <svg viewBox="0 0 24 24" width="34" height="34">
-          <path d="M3 15c3 2 15 2 18 0l-2.5 4.5c-.4.8-1.2 1.2-2 1.2h-9c-.8 0-1.6-.4-2-1.2L3 15z" fill="#b3574d"/>
+          <path class="boat-hull" d="M3 15c3 2 15 2 18 0l-2.5 4.5c-.4.8-1.2 1.2-2 1.2h-9c-.8 0-1.6-.4-2-1.2L3 15z"/>
           <path d="M12 3l4 10H8L12 3z" fill="#b98a3e"/>
         </svg>
       </div>
@@ -115,6 +115,7 @@ const handleRegister = async () => {
   text-align: center;
 }
 .boat-mark { margin-bottom: 6px; }
+.boat-hull { fill: var(--accent); }
 .title {
   font-family: var(--serif);
   text-align: center;
