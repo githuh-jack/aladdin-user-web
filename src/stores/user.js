@@ -8,6 +8,7 @@ export const useUserStore = defineStore('user', {
     username: '',
     realName: '',
     avatar: '',
+    signature: '',
     roles: []
   }),
   getters: {
@@ -57,10 +58,16 @@ export const useUserStore = defineStore('user', {
         // ignore
       }
     },
+    // 更新头像/签名(由个人中心编辑资料后调用)
+    setProfileInfo({ avatar, signature } = {}) {
+      if (avatar !== undefined) this.avatar = avatar
+      if (signature !== undefined) this.signature = signature
+    },
     restoreFromStorage() {
       this.userId = localStorage.getItem('userId')
       this.username = localStorage.getItem('username') || ''
       this.realName = localStorage.getItem('realName') || ''
+      this.avatar = localStorage.getItem('avatar') || ''
       const rolesStr = localStorage.getItem('roles')
       this.roles = rolesStr ? JSON.parse(rolesStr) : []
     },
@@ -73,6 +80,7 @@ export const useUserStore = defineStore('user', {
       this.username = ''
       this.realName = ''
       this.avatar = ''
+      this.signature = ''
       this.roles = []
       localStorage.clear()
     }

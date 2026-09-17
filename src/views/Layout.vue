@@ -27,7 +27,7 @@
             <span class="brand-sub">把心事折成纸船，寄给在乎的人</span>
           </div>
 
-          <nav class="nav-links">
+          <nav v-if="!isGuest" class="nav-links">
             <span v-for="n in navMenus" :key="n.path" class="nav-link"
                   :class="{ on: isActive(n.path) }" @click="go(n.path)">{{ n.title }}</span>
           </nav>
@@ -51,10 +51,10 @@
                 </div>
               </div>
             </el-popover>
-            <el-button v-if="!isGuest" round type="primary" size="small" @click="go('/letters/write')">✎ 写信</el-button>
             <template v-if="!isGuest">
               <el-dropdown trigger="click" @command="onCommand">
-                <div class="avatar">{{ avatarChar }}</div>
+                <img v-if="userStore.avatar" class="avatar avatar-img" :src="userStore.avatar" alt="头像" />
+                <div v-else class="avatar">{{ avatarChar }}</div>
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item command="profile">个人中心</el-dropdown-item>
@@ -99,7 +99,6 @@ const navMenus = [
   { path: '/home', title: '首页' },
   { path: '/letters', title: '信件' },
   { path: '/diary', title: '日记' },
-  { path: '/thoughts', title: '随记' },
   { path: '/notes', title: '话题' },
   { path: '/shop', title: '商店' }
 ]
@@ -108,7 +107,6 @@ const adminMenus = [
   { path: '/admin/letters', title: '信件' },
   { path: '/admin/friends', title: '好友' },
   { path: '/admin/diary', title: '日记' },
-  { path: '/admin/thoughts', title: '随记' },
   { path: '/admin/notes', title: '话题' },
   { path: '/admin/stamps', title: '邮票' },
   { path: '/admin/envelopes', title: '信封' },
@@ -215,7 +213,7 @@ onMounted(async () => {
   background: var(--accent-soft);
   font-weight: 600;
 }
-.nav-right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.nav-right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; margin-left: auto; }
 .avatar {
   width: 36px;
   height: 36px;
@@ -230,6 +228,7 @@ onMounted(async () => {
   font-size: 15px;
   cursor: pointer;
 }
+.avatar-img { object-fit: cover; }
 
 /* ---------- 主题颜色选择 ---------- */
 .boat-hull { fill: var(--accent); }

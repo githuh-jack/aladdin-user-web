@@ -2,9 +2,12 @@
   <div>
     <div class="head-row">
       <span class="poetic-title">信箱</span>
-      <div class="seg">
-        <button class="seg-item" :class="{ on: activeTab === 'inbox' }" @click="switchTab('inbox')">收到的</button>
-        <button class="seg-item" :class="{ on: activeTab === 'sent' }" @click="switchTab('sent')">寄出的</button>
+      <div class="head-actions">
+        <el-button round type="primary" size="small" @click="$router.push('/letters/write')">✎ 写信</el-button>
+        <div class="seg">
+          <button class="seg-item" :class="{ on: activeTab === 'inbox' }" @click="switchTab('inbox')">收到的</button>
+          <button class="seg-item" :class="{ on: activeTab === 'sent' }" @click="switchTab('sent')">寄出的</button>
+        </div>
       </div>
     </div>
 
@@ -85,6 +88,7 @@ onMounted(load)
   justify-content: space-between;
   margin-bottom: 14px;
 }
+.head-actions { display: flex; align-items: center; gap: 12px; }
 .env-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: start; }
 .envelope {
   position: relative;

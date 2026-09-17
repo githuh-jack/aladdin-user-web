@@ -3,9 +3,9 @@
     <div class="head-row">
       <span class="poetic-title">日记</span>
       <div class="head-actions">
-        <el-button v-if="activeTab === 'mine'" round type="primary" size="small" @click="$router.push('/diary/write')">写日记</el-button>
+        <el-button v-if="!isGuest && activeTab === 'mine'" round type="primary" size="small" @click="$router.push('/diary/write')">写日记</el-button>
         <div class="seg">
-          <button class="seg-item" :class="{ on: activeTab === 'mine' }" @click="switchTab('mine')">我的</button>
+          <button v-if="!isGuest" class="seg-item" :class="{ on: activeTab === 'mine' }" @click="switchTab('mine')">我的</button>
           <button class="seg-item" :class="{ on: activeTab === 'public' }" @click="switchTab('public')">广场</button>
         </div>
       </div>
@@ -103,8 +103,12 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, EditPen } from '@element-plus/icons-vue'
 import { diaryApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
-const activeTab = ref('mine')
+const userStore = useUserStore()
+const isGuest = computed(() => !userStore.token)
+
+const activeTab = ref(!useUserStore().token ? 'public' : 'mine')
 const viewMode = ref('list')
 const selectedDate = ref(new Date())
 const list = ref([])

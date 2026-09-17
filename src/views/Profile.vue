@@ -3,13 +3,22 @@
     <!-- 名片 + 铜钱 -->
     <div class="top-grid">
       <div class="profile-card paper-card">
-        <div class="avatar-circle">{{ avatarChar }}</div>
+        <img v-if="userStore.avatar" class="avatar-img" :src="userStore.avatar" alt="头像" />
+        <div v-else class="avatar-circle">{{ avatarChar }}</div>
         <div class="name">{{ userStore.realName || userStore.username || '旅人' }}</div>
         <div class="sub">ID · {{ userStore.userId || '—' }}</div>
+        <div class="sig">{{ profile.signature || '还没有个性签名，点击下方编辑' }}</div>
+        <div class="info-chips">
+          <span class="role-chip">信用分 · {{ profile.creditScore }}</span>
+          <span class="role-chip">性别 · {{ genderText }}</span>
+          <span class="role-chip">地区 · {{ regionText }}</span>
+          <span class="role-chip" v-if="profile.age !== null && profile.age !== undefined">年龄 · {{ ageText }}</span>
+        </div>
         <div class="roles">
           <span v-for="r in (userStore.roles || [])" :key="r" class="role-chip">{{ r }}</span>
           <span v-if="!userStore.roles || !userStore.roles.length" class="role-chip">普通用户</span>
         </div>
+        <el-button round size="small" style="margin-top: 12px" @click="openEdit">编辑资料</el-button>
       </div>
 
       <div class="coin-card paper-card">
@@ -130,6 +139,47 @@
       <div v-else class="empty-poem">还没有收藏任何邮票，去商店挑一枚吧。</div>
     </el-dialog>
 
+    <!-- 编辑资料 -->
+    <el-dialog v-model="editVisible" title="编辑资料" width="92%" style="max-width: 480px">
+      <el-form label-width="80px">
+        <el-form-item label="头像">
+          <div class="avatar-edit-row">
+            <img v-if="editing.avatarUrl" class="avatar-preview" :src="editing.avatarUrl" alt="预览" />
+            <div v-else class="avatar-preview avatar-preview-empty">{{ avatarChar }}</div>
+            <el-input v-model="editing.avatarUrl" placeholder="输入头像图片URL" clearable />
+          </div>
+        </el-form-item>
+        <el-form-item label="个性签名">
+          <el-input v-model="editing.signature" maxlength="100" show-word-limit placeholder="写一句 signature 放在这里" />
+        </el-form-item>
+        <el-form-item label="性别">
+          <el-radio-group v-model="editing.gender">
+            <el-radio :value="0">保密</el-radio>
+            <el-radio :value="1">男</el-radio>
+            <el-radio :value="2">女</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="地区">
+          <el-input v-model="editing.region" maxlength="100" placeholder="如：杭州" style="width: 160px" />
+          <el-checkbox v-model="regionSecret" style="margin-left: 12px">保密</el-checkbox>
+        </el-form-item>
+        <el-form-item label="年龄">
+          <el-input-number v-model="editing.age" :min="1" :max="120" style="width: 160px" />
+          <el-checkbox v-model="ageSecret" style="margin-left: 12px">保密</el-checkbox>
+        </el-form-item>
+        <el-form-item label="邀请码">
+          <el-input v-model="editing.inviteCode" maxlength="16" placeholder="4-16位字母或数字" clearable />
+        </el-form-item>
+        <el-form-item label="信用分">
+          <el-input :model-value="profile.creditScore" disabled style="width: 160px" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button round @click="editVisible = false">取消</el-button>
+        <el-button round type="primary" :loading="savingProfile" @click="saveProfile">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 退出 -->
     <div class="logout-row">
       <el-button round @click="logout">退出登录</el-button>
@@ -138,11 +188,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { coinApi, stampApi, envelopeApi, friendApi } from '@/api'
+import { coinApi, stampApi, envelopeApi, friendApi, profileApi } from '@/api'
 import Friends from './Friends.vue'
 
 const router = useRouter()
@@ -156,6 +206,86 @@ const myStamps = ref([])
 const myEnvelopes = ref([])
 const orders = ref([])
 const logs = ref([])
+
+// 用户资料(邀请码/性别/地区/年龄/信用分/头像/个性签名)
+const profile = reactive({
+  inviteCode: '',
+  gender: 0,
+  region: '',
+  regionSecret: 1,
+  age: null,
+  ageSecret: 1,
+  signature: '',
+  avatarUrl: '',
+  creditScore: 100
+})
+const editVisible = ref(false)
+const savingProfile = ref(false)
+const editing = reactive({
+  inviteCode: '',
+  gender: 0,
+  region: '',
+  regionSecret: 0,
+  age: null,
+  ageSecret: 0,
+  signature: '',
+  avatarUrl: ''
+})
+
+const genderText = computed(() => ['保密', '男', '女'][profile.gender] || '保密')
+const regionText = computed(() => {
+  if (!profile.region) return '保密'
+  return profile.regionSecret === 1 ? '保密' : profile.region
+})
+const ageText = computed(() => (profile.ageSecret === 1 ? '保密' : `${profile.age} 岁`))
+
+const loadProfile = async () => {
+  try {
+    const r = await profileApi.me()
+    const d = r.data || {}
+    profile.inviteCode = d.inviteCode || ''
+    profile.gender = d.gender ?? 0
+    profile.region = d.region || ''
+    profile.regionSecret = d.regionSecret ?? 1
+    profile.age = d.age ?? null
+    profile.ageSecret = d.ageSecret ?? 1
+    profile.signature = d.signature || ''
+    profile.avatarUrl = d.avatarUrl || ''
+    profile.creditScore = d.creditScore ?? 100
+    userStore.setProfileInfo({ avatar: profile.avatarUrl, signature: profile.signature })
+  } catch (e) { /* ignore */ }
+}
+
+const openEdit = () => {
+  editing.inviteCode = profile.inviteCode
+  editing.gender = profile.gender
+  editing.region = profile.region
+  editing.regionSecret = profile.regionSecret
+  editing.age = profile.age
+  editing.ageSecret = profile.ageSecret
+  editing.signature = profile.signature
+  editing.avatarUrl = profile.avatarUrl
+  editVisible.value = true
+}
+
+const saveProfile = async () => {
+  savingProfile.value = true
+  try {
+    await profileApi.save({
+      inviteCode: editing.inviteCode,
+      gender: editing.gender,
+      region: editing.region,
+      regionSecret: editing.regionSecret ? 1 : 0,
+      age: editing.age,
+      ageSecret: editing.ageSecret ? 1 : 0,
+      signature: editing.signature,
+      avatarUrl: editing.avatarUrl
+    })
+    ElMessage.success('资料已保存')
+    editVisible.value = false
+    loadProfile()
+  } finally { savingProfile.value = false }
+}
 
 // 好友管理(点击"好友"卡片查看)
 const friendsVisible = ref(false)
@@ -202,6 +332,7 @@ const loadAll = async () => {
     orders.value = o.data || []
     logs.value = l.data?.items || l.data || []
     loadFriendCount()
+    loadProfile()
   } finally { loading.value = false }
 }
 
@@ -251,6 +382,43 @@ onMounted(loadAll)
   font-size: 28px;
   margin: 0 auto 10px;
 }
+.avatar-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--soft-border);
+  margin: 0 auto 10px;
+  display: block;
+}
+.avatar-edit-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+.avatar-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--soft-border);
+  flex-shrink: 0;
+}
+.avatar-preview-empty {
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 20px;
+}
+.sig {
+  font-family: var(--serif);
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.info-chips { display: flex; justify-content: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 .name { font-family: var(--serif); font-size: 18px; font-weight: 700; color: var(--ink); }
 .sub { font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
 .roles { display: flex; justify-content: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }

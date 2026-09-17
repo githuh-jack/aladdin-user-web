@@ -49,9 +49,16 @@ export const authApi = {
   userDetail: () => request.get('/system/user/info')
 }
 
+// 用户资料(邀请码/性别/地区/年龄/信用分/头像/个性签名)
+export const profileApi = {
+  me: () => request.get('/biz/profile/me'),
+  save: (data) => request.post('/biz/profile/save', data)
+}
+
 // 信件
 export const letterApi = {
   write: (data) => request.post('/biz/letter/write', data),
+  publicWriters: () => request.get('/biz/letter/public/writers'),
   sent: (params) => request.get('/biz/letter/sent', { params }),
   inbox: (params) => request.get('/biz/letter/inbox', { params }),
   detail: (id) => request.get(`/biz/letter/detail/${id}`),
@@ -83,16 +90,6 @@ export const diaryApi = {
   save: (data) => request.post('/biz/diary', data),
   update: (data) => request.post('/biz/diary/edit', data),
   remove: (id) => request.post(`/biz/diary/remove/${id}`)
-}
-
-// 感想
-export const thoughtApi = {
-  list: (params) => request.get('/biz/thought/list', { params }),
-  publicList: (params) => request.get('/biz/thought/public', { params }),
-  detail: (id) => request.get(`/biz/thought/detail/${id}`),
-  save: (data) => request.post('/biz/thought', data),
-  update: (data) => request.post('/biz/thought/edit', data),
-  remove: (id) => request.post(`/biz/thought/remove/${id}`)
 }
 
 // 其他笔记
@@ -148,7 +145,6 @@ export const adminApi = {
   letters: (params) => request.get('/biz/letter/admin/list', { params }),
   friends: () => request.get('/biz/friend/admin/list'),
   diary: (params) => request.get('/biz/diary/admin/list', { params }),
-  thoughts: (params) => request.get('/biz/thought/admin/list', { params }),
   notes: (params) => request.get('/biz/note/admin/list', { params }),
   stamps: () => request.get('/biz/stamp/admin/list'),
   stampAdd: (data) => request.post('/biz/stamp/admin/add', data),

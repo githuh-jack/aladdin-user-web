@@ -12,45 +12,42 @@
       </template>
     </div>
 
-    <!-- 入口 -->
-    <div class="entry-grid">
-      <template v-if="!isGuest">
-        <div class="entry" @click="$router.push('/letters')">
-          <span class="entry-icon">📬</span><span>未读信件</span>
-          <span v-if="unreadLetters" class="entry-badge">{{ unreadLetters }}</span>
-        </div>
-        <div class="entry" @click="$router.push('/letters/write')">
-          <span class="entry-icon">✉️</span><span>写信</span>
-        </div>
-        <div class="entry" @click="$router.push('/diary/write')">
-          <span class="entry-icon">📖</span><span>日记</span>
-        </div>
-        <div class="entry" @click="$router.push('/thoughts')">
-          <span class="entry-icon">🍃</span><span>随记</span>
-        </div>
-        <div class="entry" @click="$router.push('/notes')">
-          <span class="entry-icon">📎</span><span>话题</span>
-        </div>
-      </template>
-      <template v-else>
-        <div class="entry" @click="$router.push('/thoughts')">
-          <span class="entry-icon">🍃</span><span>随记广场</span>
-        </div>
-        <div class="entry" @click="$router.push('/notes')">
-          <span class="entry-icon">📎</span><span>话题广场</span>
-        </div>
-        <div class="entry entry-cta" @click="$router.push('/login')">
-          <span class="entry-icon">⛵</span><span>登船 / 注册</span>
-        </div>
-      </template>
+    <!-- 入口(仅登录用户) -->
+    <div v-if="!isGuest" class="entry-grid">
+      <div class="entry" @click="$router.push('/letters')">
+        <span class="entry-icon">📬</span><span>未读信件</span>
+        <span v-if="unreadLetters" class="entry-badge">{{ unreadLetters }}</span>
+      </div>
+      <div class="entry" @click="$router.push('/letters/write')">
+        <span class="entry-icon">✉️</span><span>写信</span>
+      </div>
+      <div class="entry" @click="$router.push('/diary/write')">
+        <span class="entry-icon">📖</span><span>日记</span>
+      </div>
+      <div class="entry" @click="$router.push('/notes')">
+        <span class="entry-icon">📎</span><span>话题</span>
+      </div>
     </div>
 
-    <!-- 游客提示 -->
-    <div v-if="isGuest" class="guest-tip paper-card">
-      你正在以游客身份浏览，可查看广场上的公开随记与话题。写信、日记等私人岛屿需要
-      <span class="guest-login" @click="$router.push('/login')">登录</span>
-      后才能抵达。
-    </div>
+    <!-- 游客：信件广场(仅展示写信人头像) -->
+    <template v-if="isGuest">
+      <div class="sq-block">
+        <div class="sq-head">
+          <span class="sq-title">⛵ 信件广场</span>
+        </div>
+        <div v-if="writers.length" class="writer-grid">
+          <div v-for="w in writers" :key="w.user_id" class="writer" @click="$router.push('/login')">
+            <img v-if="w.avatar_url" class="writer-avatar" :src="w.avatar_url" alt="头像" />
+            <span v-else class="writer-avatar writer-avatar-fallback">{{ (w.sender_name || '客').slice(0, 1) }}</span>
+            <span class="writer-name">{{ w.sender_name || '匿名旅人' }}</span>
+          </div>
+        </div>
+        <div v-else class="sq-empty">还没有人寄出纸船，成为第一个吧</div>
+        <div class="writer-hint">最近在这里写信的旅人。游客只能看看，写信需要
+          <span class="guest-login" @click="$router.push('/login')">登录</span>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -61,6 +58,8 @@ import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
 const unreadLetters = ref(0)
+// 信件广场：最近写信人(仅头像与昵称)
+const writers = ref([])
 
 const isGuest = computed(() => !userStore.token)
 
@@ -74,7 +73,13 @@ const greeting = computed(() => {
 })
 
 onMounted(async () => {
-  if (isGuest.value) return
+  if (isGuest.value) {
+    try {
+      const r = await letterApi.publicWriters()
+      writers.value = r.data || []
+    } catch {}
+    return
+  }
   try {
     const r = await letterApi.inbox({ page: 1, limit: 100 })
     unreadLetters.value = (r.data.items || []).filter(x => x.status === 1).length
@@ -136,4 +141,66 @@ onMounted(async () => {
   max-width: 640px;
 }
 .guest-login { color: var(--accent); cursor: pointer; border-bottom: 1px dashed var(--accent); }
+
+.sq-block { margin-top: 22px; }
+.sq-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.sq-title { font-family: var(--serif); font-size: 16px; font-weight: 700; color: var(--ink); }
+.writer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.writer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 64px;
+  cursor: pointer;
+}
+.writer:active { transform: scale(0.95); }
+.writer-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--soft-border);
+}
+.writer-avatar-fallback {
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 20px;
+}
+.writer-name {
+  font-size: 11px;
+  color: var(--ink-soft);
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.writer-hint {
+  margin-top: 14px;
+  font-family: var(--serif);
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.8;
+}
+.guest-login { color: var(--accent); cursor: pointer; border-bottom: 1px dashed var(--accent); }
+.sq-empty {
+  text-align: center;
+  font-family: var(--serif);
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 18px 0;
+  letter-spacing: 1px;
+}
 </style>
