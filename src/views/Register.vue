@@ -19,8 +19,14 @@
         <el-form-item label="确认密码" prop="confirm">
           <el-input v-model="form.confirm" type="password" placeholder="再次输入密码" show-password />
         </el-form-item>
-        <el-form-item label="昵称(可选)">
-          <el-input v-model="form.nickname" placeholder="不填则使用用户名" />
+        <el-form-item label="笔名" prop="nickname">
+          <el-input v-model="form.nickname" placeholder="将展示在信件与广场上" maxlength="30" />
+        </el-form-item>
+        <el-form-item label="邀请码(可选)" prop="inviteCode">
+          <el-input v-model="form.inviteCode" placeholder="有朋友邀请你？填TA的邀请码" maxlength="16" @blur="checkInvite" />
+          <div v-if="inviteCheck.done" class="invite-tip" :class="inviteCheck.valid ? 'invite-ok' : 'invite-bad'">
+            {{ inviteCheck.valid ? `邀请码有效，将由「${inviteCheck.name}」邀请你登船` : '邀请码不存在，可留空或检查后重试' }}
+          </div>
         </el-form-item>
         <el-form-item label="邮箱(可选)">
           <el-input v-model="form.email" placeholder="可选" />
@@ -39,17 +45,35 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { inviteApi } from '@/api'
 
 const router = useRouter()
 const userStore = useUserStore()
 const formRef = ref()
 const loading = ref(false)
 
+// 邀请码实时校验结果
+const inviteCheck = reactive({ done: false, valid: false, name: '' })
+
+const checkInvite = async () => {
+  const code = (form.inviteCode || '').trim()
+  inviteCheck.done = false
+  if (!code) return
+  try {
+    const r = await inviteApi.check(code)
+    const d = r.data || {}
+    inviteCheck.valid = !!d.valid
+    inviteCheck.name = d.inviterName || ''
+    inviteCheck.done = true
+  } catch (e) { /* ignore */ }
+}
+
 const form = reactive({
   username: '',
   password: '',
   confirm: '',
   nickname: '',
+  inviteCode: '',
   email: ''
 })
 
@@ -70,6 +94,13 @@ const rules = {
   confirm: [
     { required: true, message: '请再次输入密码', trigger: 'blur' },
     { validator: validatePass, trigger: 'blur' }
+  ],
+  nickname: [
+    { required: true, message: '请输入笔名', trigger: 'blur' },
+    { min: 1, max: 30, message: '笔名最多30个字符', trigger: 'blur' }
+  ],
+  inviteCode: [
+    { pattern: /^[A-Za-z0-9]{4,16}$/, message: '邀请码需为4-16位字母或数字', trigger: 'blur' }
   ]
 }
 
@@ -82,6 +113,7 @@ const handleRegister = async () => {
         username: form.username,
         password: form.password,
         nickname: form.nickname,
+        inviteCode: form.inviteCode,
         email: form.email
       })
       ElMessage.success('注册成功，请登录')
@@ -128,4 +160,7 @@ const handleRegister = async () => {
 :deep(.el-input__wrapper) { border-radius: 10px; box-shadow: 0 0 0 1px var(--line) inset; }
 .footer { text-align: center; font-size: 13px; color: var(--ink-faint); margin-top: 4px; }
 .footer a { color: var(--accent); text-decoration: none; }
+.invite-tip { font-size: 12px; line-height: 1.6; margin-top: 4px; }
+.invite-ok { color: #67c23a; }
+.invite-bad { color: #c45656; }
 </style>

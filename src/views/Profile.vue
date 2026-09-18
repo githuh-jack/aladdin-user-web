@@ -9,11 +9,14 @@
         <div class="sub">ID · {{ userStore.userId || '—' }}</div>
         <div class="sig">{{ profile.signature || '还没有个性签名，点击下方编辑' }}</div>
         <div class="info-chips">
-          <span class="role-chip">信用分 · {{ profile.creditScore }}</span>
+          <span class="role-chip">邀请码 · {{ profile.inviteCode || '—' }}</span>
           <span class="role-chip">性别 · {{ genderText }}</span>
           <span class="role-chip">地区 · {{ regionText }}</span>
           <span class="role-chip" v-if="profile.age !== null && profile.age !== undefined">年龄 · {{ ageText }}</span>
         </div>
+        <div v-if="profile.avatarStatus === 1" class="avatar-status-tip">头像审核中，审核通过后生效</div>
+        <div v-else-if="profile.avatarStatus === 3" class="avatar-status-tip avatar-status-reject">头像未通过审核，可重新上传</div>
+        <div v-if="invite.total > 0" class="avatar-status-tip">已邀请 {{ invite.total }} 人登船 · 获信用分奖励 {{ invite.reward }}</div>
         <div class="roles">
           <span v-for="r in (userStore.roles || [])" :key="r" class="role-chip">{{ r }}</span>
           <span v-if="!userStore.roles || !userStore.roles.length" class="role-chip">普通用户</span>
@@ -144,9 +147,18 @@
       <el-form label-width="80px">
         <el-form-item label="头像">
           <div class="avatar-edit-row">
-            <img v-if="editing.avatarUrl" class="avatar-preview" :src="editing.avatarUrl" alt="预览" />
-            <div v-else class="avatar-preview avatar-preview-empty">{{ avatarChar }}</div>
-            <el-input v-model="editing.avatarUrl" placeholder="输入头像图片URL" clearable />
+            <div class="avatar-upload" title="点击上传本地头像" @click="pickAvatar">
+              <img v-if="editing.avatarUrl" class="avatar-preview" :src="editing.avatarUrl" alt="预览" />
+              <div v-else class="avatar-preview avatar-preview-empty">{{ avatarChar }}</div>
+              <span class="avatar-upload-mask">更换</span>
+            </div>
+            <div class="avatar-edit-tip">
+              <div>点击左侧头像上传本地图片</div>
+              <div class="avatar-edit-sub">支持 jpg/png/gif/webp，不超过5MB，审核通过后生效</div>
+              <el-tag v-if="avatarReviewStatus === 1" size="small" type="warning">审核中</el-tag>
+              <el-tag v-else-if="avatarReviewStatus === 3" size="small" type="danger">未通过</el-tag>
+            </div>
+            <input ref="avatarInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp" style="display: none" @change="onAvatarChange" />
           </div>
         </el-form-item>
         <el-form-item label="个性签名">
@@ -161,17 +173,15 @@
         </el-form-item>
         <el-form-item label="地区">
           <el-input v-model="editing.region" maxlength="100" placeholder="如：杭州" style="width: 160px" />
-          <el-checkbox v-model="regionSecret" style="margin-left: 12px">保密</el-checkbox>
+          <el-checkbox v-model="editing.regionSecret" :true-value="1" :false-value="0" style="margin-left: 12px">保密</el-checkbox>
         </el-form-item>
         <el-form-item label="年龄">
           <el-input-number v-model="editing.age" :min="1" :max="120" style="width: 160px" />
-          <el-checkbox v-model="ageSecret" style="margin-left: 12px">保密</el-checkbox>
+          <el-checkbox v-model="editing.ageSecret" :true-value="1" :false-value="0" style="margin-left: 12px">保密</el-checkbox>
         </el-form-item>
         <el-form-item label="邀请码">
-          <el-input v-model="editing.inviteCode" maxlength="16" placeholder="4-16位字母或数字" clearable />
-        </el-form-item>
-        <el-form-item label="信用分">
-          <el-input :model-value="profile.creditScore" disabled style="width: 160px" />
+          <el-input :model-value="profile.inviteCode" disabled style="width: 160px" />
+          <span class="avatar-edit-sub" style="margin-left: 8px">由系统自动生成</span>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -192,7 +202,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { coinApi, stampApi, envelopeApi, friendApi, profileApi } from '@/api'
+import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi } from '@/api'
 import Friends from './Friends.vue'
 
 const router = useRouter()
@@ -207,7 +217,7 @@ const myEnvelopes = ref([])
 const orders = ref([])
 const logs = ref([])
 
-// 用户资料(邀请码/性别/地区/年龄/信用分/头像/个性签名)
+// 用户资料(邀请码/性别/地区/年龄/头像/个性签名)
 const profile = reactive({
   inviteCode: '',
   gender: 0,
@@ -217,12 +227,12 @@ const profile = reactive({
   ageSecret: 1,
   signature: '',
   avatarUrl: '',
+  avatarStatus: 0,
   creditScore: 100
 })
 const editVisible = ref(false)
 const savingProfile = ref(false)
 const editing = reactive({
-  inviteCode: '',
   gender: 0,
   region: '',
   regionSecret: 0,
@@ -231,6 +241,21 @@ const editing = reactive({
   signature: '',
   avatarUrl: ''
 })
+// 头像上传
+const avatarInput = ref(null)
+const uploadingAvatar = ref(false)
+const avatarReviewStatus = ref(0)
+
+// 邀请记录(已邀请人数与奖励)
+const invite = reactive({ total: 0, reward: 0 })
+const loadInvite = async () => {
+  try {
+    const r = await inviteApi.my()
+    const d = r.data || {}
+    invite.total = (d.records || []).length
+    invite.reward = d.totalReward || 0
+  } catch (e) { /* ignore */ }
+}
 
 const genderText = computed(() => ['保密', '男', '女'][profile.gender] || '保密')
 const regionText = computed(() => {
@@ -251,13 +276,13 @@ const loadProfile = async () => {
     profile.ageSecret = d.ageSecret ?? 1
     profile.signature = d.signature || ''
     profile.avatarUrl = d.avatarUrl || ''
+    profile.avatarStatus = d.avatarStatus ?? 0
     profile.creditScore = d.creditScore ?? 100
     userStore.setProfileInfo({ avatar: profile.avatarUrl, signature: profile.signature })
   } catch (e) { /* ignore */ }
 }
 
 const openEdit = () => {
-  editing.inviteCode = profile.inviteCode
   editing.gender = profile.gender
   editing.region = profile.region
   editing.regionSecret = profile.regionSecret
@@ -265,21 +290,50 @@ const openEdit = () => {
   editing.ageSecret = profile.ageSecret
   editing.signature = profile.signature
   editing.avatarUrl = profile.avatarUrl
+  avatarReviewStatus.value = profile.avatarStatus
   editVisible.value = true
+}
+
+// 点击头像选择本地图片并立即上传(进入审核)
+const pickAvatar = () => {
+  if (uploadingAvatar.value) return
+  avatarInput.value && avatarInput.value.click()
+}
+
+const onAvatarChange = async (e) => {
+  const file = e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('头像图片不能超过5MB')
+    return
+  }
+  uploadingAvatar.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const r = await profileApi.uploadAvatar(fd)
+    const d = r.data || {}
+    // 预览待审核头像(仅本地展示，不影响正式头像)
+    editing.avatarUrl = URL.createObjectURL(file)
+    avatarReviewStatus.value = 1
+    profile.avatarStatus = 1
+    ElMessage.success('头像已上传，等待审核通过后生效')
+  } finally {
+    uploadingAvatar.value = false
+  }
 }
 
 const saveProfile = async () => {
   savingProfile.value = true
   try {
     await profileApi.save({
-      inviteCode: editing.inviteCode,
       gender: editing.gender,
       region: editing.region,
       regionSecret: editing.regionSecret ? 1 : 0,
       age: editing.age,
       ageSecret: editing.ageSecret ? 1 : 0,
-      signature: editing.signature,
-      avatarUrl: editing.avatarUrl
+      signature: editing.signature
     })
     ElMessage.success('资料已保存')
     editVisible.value = false
@@ -333,6 +387,7 @@ const loadAll = async () => {
     logs.value = l.data?.items || l.data || []
     loadFriendCount()
     loadProfile()
+    loadInvite()
   } finally { loading.value = false }
 }
 
@@ -392,6 +447,34 @@ onMounted(loadAll)
   display: block;
 }
 .avatar-edit-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+.avatar-upload {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.avatar-upload-mask {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 16px;
+  line-height: 16px;
+  font-size: 10px;
+  text-align: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0 0 24px 24px;
+  pointer-events: none;
+}
+.avatar-edit-tip { font-size: 12px; color: var(--ink-soft); line-height: 1.7; }
+.avatar-edit-sub { font-size: 11px; color: var(--ink-faint); }
+.avatar-status-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-family: var(--serif);
+}
+.avatar-status-reject { color: #c45656; }
 .avatar-preview {
   width: 48px;
   height: 48px;

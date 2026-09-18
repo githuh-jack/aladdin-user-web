@@ -32,6 +32,7 @@ const routes = [
       { path: 'admin/friends', name: 'AdminFriends', component: () => import('@/views/admin/Friends.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/diary', name: 'AdminDiary', component: () => import('@/views/admin/Diary.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/notes', name: 'AdminNotes', component: () => import('@/views/admin/Notes.vue'), meta: { requiresAdmin: true } },
+      { path: 'admin/avatars', name: 'AdminAvatars', component: () => import('@/views/admin/AvatarReview.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/stamps', name: 'AdminStamps', component: () => import('@/views/admin/Stamps.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/envelopes', name: 'AdminEnvelopes', component: () => import('@/views/admin/Envelopes.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/coin', name: 'AdminCoin', component: () => import('@/views/admin/Coin.vue'), meta: { requiresAdmin: true } },

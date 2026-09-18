@@ -52,7 +52,14 @@ export const authApi = {
 // 用户资料(邀请码/性别/地区/年龄/信用分/头像/个性签名)
 export const profileApi = {
   me: () => request.get('/biz/profile/me'),
-  save: (data) => request.post('/biz/profile/save', data)
+  save: (data) => request.post('/biz/profile/save', data),
+  uploadAvatar: (formData) => request.post('/biz/profile/avatar/upload', formData)
+}
+
+// 邀请码
+export const inviteApi = {
+  check: (code) => request.get('/biz/invite/check', { params: { code } }),
+  my: () => request.get('/biz/invite/my')
 }
 
 // 信件
@@ -143,6 +150,8 @@ export const shopApi = {
 // 业务管理(仅admin)
 export const adminApi = {
   letters: (params) => request.get('/biz/letter/admin/list', { params }),
+  avatarReviews: (params) => request.get('/biz/profile/admin/reviews', { params }),
+  avatarReview: (data) => request.post('/biz/profile/admin/review', data),
   friends: () => request.get('/biz/friend/admin/list'),
   diary: (params) => request.get('/biz/diary/admin/list', { params }),
   notes: (params) => request.get('/biz/note/admin/list', { params }),

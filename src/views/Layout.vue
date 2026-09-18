@@ -108,6 +108,7 @@ const adminMenus = [
   { path: '/admin/friends', title: '好友' },
   { path: '/admin/diary', title: '日记' },
   { path: '/admin/notes', title: '话题' },
+  { path: '/admin/avatars', title: '头像审核' },
   { path: '/admin/stamps', title: '邮票' },
   { path: '/admin/envelopes', title: '信封' },
   { path: '/admin/coin', title: '铜钱' },
