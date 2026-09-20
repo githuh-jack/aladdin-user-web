@@ -165,7 +165,12 @@ export const adminApi = {
   envelopeRemove: (id) => request.post(`/biz/envelope/admin/remove/${id}`),
   coinLogs: (params) => request.get('/biz/coin/admin/logs', { params }),
   coinOrders: (params) => request.get('/biz/coin/admin/orders', { params }),
-  coinAdjust: (data) => request.post('/biz/coin/admin/adjust', data)
+  coinAdjust: (data) => request.post('/biz/coin/admin/adjust', data),
+  loginLogs: (params) => request.get('/biz/log/admin/login', { params }),
+  bambooList: (params) => request.get('/biz/bamboo/admin/list', { params }),
+  bambooLogs: (params) => request.get('/biz/bamboo/admin/logs', { params }),
+  configList: () => request.get('/biz/config/admin/list'),
+  configSave: (data) => request.post('/biz/config/admin/save', data)
 }
 
 export default request
