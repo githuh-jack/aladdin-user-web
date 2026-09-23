@@ -13,15 +13,15 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/auth': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:9200',
         changeOrigin: true
       },
       '/biz': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:9200',
         changeOrigin: true
       },
       '/system': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:9200',
         changeOrigin: true
       }
     }
