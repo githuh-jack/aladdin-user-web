@@ -6,7 +6,7 @@
         <img v-if="userStore.avatar" class="avatar-img" :src="userStore.avatar" alt="头像" />
         <div v-else class="avatar-circle">{{ avatarChar }}</div>
         <div class="name">{{ userStore.realName || userStore.username || '旅人' }}</div>
-        <div class="sub">ID · {{ userStore.userId || '—' }}</div>
+        <div class="sub">编号 · {{ userNo || '—' }} <span style="margin-left: 8px">ID · {{ userStore.userId || '—' }}</span></div>
         <div class="sig">{{ profile.signature || '还没有个性签名，点击下方编辑' }}</div>
         <div class="info-chips">
           <span class="role-chip">邀请码 · {{ profile.inviteCode || '—' }}</span>
@@ -67,15 +67,41 @@
       <button class="seg-item" :class="{ on: activeTab === 'orders' }" @click="activeTab = 'orders'">购买订单</button>
     </div>
 
-    <!-- 我的邮票 -->
-    <div v-if="activeTab === 'stamps'" class="goods-grid">
-      <div v-for="s in myStamps" :key="s.stampId" class="paper-card goods-card">
-        <div class="goods-stamp"><span class="goods-stamp-inner">{{ (s.stampName || '邮').slice(0, 2) }}</span></div>
-        <div class="goods-name">{{ s.stampName }}</div>
-        <div class="goods-tag">{{ s.stampType || '普通' }} · 持有 {{ s.count }}</div>
-        <el-button round size="small" @click="viewImage(s.stampImageUrl, s.stampName)">查看</el-button>
+    <!-- 我的邮票：单张/套票 两个子 tab -->
+    <div v-if="activeTab === 'stamps'">
+      <div class="seg" style="margin-bottom: 14px">
+        <button class="seg-item" :class="{ on: stampTab === 'loose' }" @click="stampTab = 'loose'">单张</button>
+        <button class="seg-item" :class="{ on: stampTab === 'series' }" @click="stampTab = 'series'">套票</button>
       </div>
-      <div v-if="!myStamps.length" class="empty-poem">还没有邮票，去商店挑一枚吧。</div>
+      <div v-if="stampTab === 'loose'" class="goods-grid">
+        <div v-for="s in looseStamps" :key="s.stampId" class="paper-card goods-card">
+          <div class="goods-stamp"><span class="goods-stamp-inner">{{ (s.stampName || '邮').slice(0, 2) }}</span></div>
+          <div class="goods-name">{{ s.stampName }}</div>
+          <div class="goods-tag">{{ s.stampType || '普通' }} · 持有 {{ s.available }}</div>
+          <el-button round size="small" @click="viewImage(s.stampImageUrl, s.stampName)">查看</el-button>
+        </div>
+        <div v-if="!looseStamps.length" class="empty-poem">还没有单张邮票，去商店挑一枚吧。</div>
+      </div>
+      <template v-else>
+        <div v-for="g in stampSeriesGroups" :key="g.series" class="paper-card series-card">
+          <div class="series-head" @click="toggleSeries(g.series)">
+            <span class="series-name">套系 · {{ g.series }}</span>
+            <span class="series-meta">{{ g.items.length }} 款 · 可用 {{ g.total }}</span>
+            <span class="series-toggle">{{ expandedSeries.includes(g.series) ? '收起 ▲' : '展开 ▼' }}</span>
+          </div>
+          <div v-if="expandedSeries.includes(g.series)" class="series-body">
+            <div v-for="s in g.items" :key="s.stampId" class="series-item">
+              <div class="goods-stamp"><span class="goods-stamp-inner">{{ (s.stampName || '邮').slice(0, 2) }}</span></div>
+              <div class="series-item-info">
+                <div class="goods-name">{{ s.stampName }}</div>
+                <div class="goods-tag">{{ s.stampType || '普通' }} · 可用 {{ s.available }} · 已用 {{ s.used }}</div>
+              </div>
+              <el-button round size="small" @click="viewImage(s.stampImageUrl, s.stampName)">查看</el-button>
+            </div>
+          </div>
+        </div>
+        <div v-if="!stampSeriesGroups.length" class="empty-poem">还没有套票，去商店挑一套吧。</div>
+      </template>
     </div>
 
     <!-- 我的信封 -->
@@ -83,7 +109,7 @@
       <div v-for="e in myEnvelopes" :key="e.envelopeId" class="paper-card goods-card">
         <div class="goods-envelope"><span>✉</span></div>
         <div class="goods-name">{{ e.envelopeName }}</div>
-        <div class="goods-tag">持有 {{ e.count }}</div>
+        <div class="goods-tag">可用 {{ e.available }}<template v-if="e.used"> · 已用 {{ e.used }}</template></div>
         <el-button round size="small" @click="viewImage(e.envelopeImageUrl, e.envelopeName)">查看</el-button>
       </div>
       <div v-if="!myEnvelopes.length" class="empty-poem">还没有信封，去商店挑一个吧。</div>
@@ -190,32 +216,50 @@
       </template>
     </el-dialog>
 
-    <!-- 退出 -->
-    <div class="logout-row">
-      <el-button round @click="logout">退出登录</el-button>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi } from '@/api'
+import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi, authApi } from '@/api'
 import Friends from './Friends.vue'
 
-const router = useRouter()
 const userStore = useUserStore()
 const avatarChar = computed(() => (userStore.realName || userStore.username || '客').slice(0, 1))
+// 用户唯一编号(邮寄信件凭编号)
+const userNo = ref('')
 
 const loading = ref(false)
 const activeTab = ref('stamps')
+// 我的邮票子 tab：loose=单张 / series=套票
+const stampTab = ref('loose')
 const balance = ref(0)
 const myStamps = ref([])
 const myEnvelopes = ref([])
 const orders = ref([])
 const logs = ref([])
+
+// 成套邮票按套系主题分组；散票为未填套系的邮票
+const stampSeriesGroups = computed(() => {
+  const map = new Map()
+  for (const s of myStamps.value) {
+    if (!s.series) continue
+    if (!map.has(s.series)) map.set(s.series, { series: s.series, items: [], total: 0 })
+    const g = map.get(s.series)
+    g.items.push(s)
+    g.total += (s.available || 0)
+  }
+  return Array.from(map.values())
+})
+const looseStamps = computed(() => myStamps.value.filter(s => !s.series))
+const expandedSeries = ref([])
+const toggleSeries = (name) => {
+  const i = expandedSeries.value.indexOf(name)
+  if (i >= 0) expandedSeries.value.splice(i, 1)
+  else expandedSeries.value.push(name)
+}
 
 // 用户资料(邀请码/性别/地区/年龄/头像/个性签名)
 const profile = reactive({
@@ -388,6 +432,11 @@ const loadAll = async () => {
     loadFriendCount()
     loadProfile()
     loadInvite()
+    // 唯一编号
+    try {
+      const r = await authApi.userInfo()
+      userNo.value = r.data?.userNo || ''
+    } catch {}
   } finally { loading.value = false }
 }
 
@@ -400,11 +449,6 @@ const viewImage = (url, name) => {
     dangerouslyUseHTMLString: true,
     confirmButtonText: '关闭'
   })
-}
-
-const logout = () => {
-  userStore.logout()
-  router.push('/login')
 }
 
 onMounted(loadAll)
@@ -596,6 +640,31 @@ onMounted(loadAll)
   margin: 6px 0 10px;
 }
 
+.series-card { padding: 12px 16px; margin-bottom: 12px; }
+.series-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.series-name { font-family: var(--serif); font-weight: 700; font-size: 14px; color: var(--ink); }
+.series-meta { font-size: 11px; color: var(--ink-faint); }
+.series-toggle { margin-left: auto; font-size: 11px; color: var(--accent); }
+.series-body { margin-top: 10px; display: grid; gap: 10px; }
+.series-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--paper-warm);
+}
+.series-item .goods-stamp { margin-bottom: 0; flex-shrink: 0; }
+.series-item-info { flex: 1; min-width: 0; }
+.series-item-info .goods-tag { margin: 4px 0 0; }
+
 .log-card, .order-card { margin-bottom: 10px; }
 .log-card { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 14px; }
 .log-type { font-family: var(--serif); font-weight: 600; font-size: 14px; }
@@ -638,6 +707,4 @@ onMounted(loadAll)
 }
 .collection-bar { flex: 1; }
 .collection-num { font-family: var(--serif); font-size: 12px; color: var(--ink-faint); width: 52px; flex-shrink: 0; text-align: right; }
-
-.logout-row { text-align: center; margin-top: 24px; }
 </style>

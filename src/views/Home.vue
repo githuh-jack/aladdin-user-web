@@ -48,18 +48,33 @@
         </div>
       </div>
     </template>
+
+    <!-- 公告弹窗(登录后可见) -->
+    <el-dialog v-model="showNotice" title="📣 船长公告" width="92%" style="max-width: 560px">
+      <div v-for="n in notices" :key="n.id" class="notice-item">
+        <div class="notice-title">{{ n.title }}</div>
+        <div class="notice-time">{{ n.sys001 }}</div>
+        <div class="notice-content">{{ n.content }}</div>
+      </div>
+      <template #footer>
+        <el-button round type="primary" @click="showNotice = false">我知道了</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { letterApi } from '@/api'
+import { letterApi, announcementApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
 const unreadLetters = ref(0)
 // 信件广场：最近写信人(仅头像与昵称)
 const writers = ref([])
+// 公告(登录后弹窗)
+const showNotice = ref(false)
+const notices = ref([])
 
 const isGuest = computed(() => !userStore.token)
 
@@ -83,6 +98,12 @@ onMounted(async () => {
   try {
     const r = await letterApi.inbox({ page: 1, limit: 100 })
     unreadLetters.value = (r.data.items || []).filter(x => x.status === 1).length
+  } catch {}
+  // 登录后拉取公告，有则弹窗展示
+  try {
+    const r = await announcementApi.published()
+    notices.value = r.data || []
+    if (notices.value.length) showNotice.value = true
   } catch {}
 })
 </script>
@@ -203,4 +224,11 @@ onMounted(async () => {
   padding: 18px 0;
   letter-spacing: 1px;
 }
+
+/* 公告弹窗 */
+.notice-item { padding: 10px 4px; border-bottom: 1px dashed var(--line); }
+.notice-item:last-child { border-bottom: none; }
+.notice-title { font-family: var(--serif); font-size: 15px; font-weight: 700; color: var(--ink); }
+.notice-time { font-size: 11px; color: var(--ink-faint); margin: 4px 0 6px; }
+.notice-content { font-size: 13px; color: var(--ink-soft); line-height: 1.8; white-space: pre-wrap; }
 </style>

@@ -40,13 +40,13 @@ request.interceptors.response.use(
   }
 )
 
-// 鉴权
+// 鉴权（传信纸船用户走 biz_user，后台管理 sys_user 由 vben 独立承担）
 export const authApi = {
-  login: (data) => request.post('/auth/login', data),
-  register: (data) => request.post('/auth/register', data),
-  logout: () => request.post('/auth/logout'),
-  userInfo: () => request.get('/auth/userInfo'),
-  userDetail: () => request.get('/system/user/info')
+  login: (data) => request.post('/biz/auth/login', data),
+  register: (data) => request.post('/biz/auth/register', data),
+  logout: () => request.post('/biz/auth/logout'),
+  userInfo: () => request.get('/biz/auth/me'),
+  userDetail: () => request.get('/biz/auth/me')
 }
 
 // 用户资料(邀请码/性别/地区/年龄/信用分/头像/个性签名)
@@ -65,6 +65,7 @@ export const inviteApi = {
 // 信件
 export const letterApi = {
   write: (data) => request.post('/biz/letter/write', data),
+  list: (params) => request.get('/biz/letter/list', { params }),
   publicWriters: () => request.get('/biz/letter/public/writers'),
   sent: (params) => request.get('/biz/letter/sent', { params }),
   inbox: (params) => request.get('/biz/letter/inbox', { params }),
@@ -82,11 +83,6 @@ export const friendApi = {
   blacklist: (targetId) => request.post(`/biz/friend/blacklist/${targetId}`),
   unblacklist: (targetId) => request.post(`/biz/friend/unblacklist/${targetId}`),
   blacklistList: () => request.get('/biz/friend/blacklist')
-}
-
-// 用户搜索(用于加好友)
-export const userApi = {
-  search: (params) => request.get('/system/user/list', { params })
 }
 
 // 日记
@@ -147,8 +143,25 @@ export const shopApi = {
   buy: (data) => request.post('/biz/shop/buy', data)
 }
 
+// 公告
+export const announcementApi = {
+  published: () => request.get('/biz/announcement/published')
+}
+
+// 系统邮件
+export const sysMailApi = {
+  list: () => request.get('/biz/mail/list'),
+  claim: (id) => request.post(`/biz/mail/claim/${id}`)
+}
+
 // 业务管理(仅admin)
 export const adminApi = {
+  announcements: () => request.get('/biz/announcement/admin/list'),
+  announcementAdd: (data) => request.post('/biz/announcement/admin/add', data),
+  announcementEdit: (data) => request.post('/biz/announcement/admin/edit', data),
+  announcementRemove: (id) => request.post(`/biz/announcement/admin/remove/${id}`),
+  sysMails: () => request.get('/biz/mail/admin/list'),
+  sysMailSend: (data) => request.post('/biz/mail/admin/send', data),
   letters: (params) => request.get('/biz/letter/admin/list', { params }),
   avatarReviews: (params) => request.get('/biz/profile/admin/reviews', { params }),
   avatarReview: (data) => request.post('/biz/profile/admin/review', data),

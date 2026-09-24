@@ -14,6 +14,7 @@
           <div class="env-title">{{ letter.title || '(无标题)' }}</div>
           <div class="env-line">{{ letter.senderName }} → {{ letter.receiverName || letter.receiverAddress || '收件地址待填' }}</div>
           <div class="env-line faint">{{ letter.sendTime || '尚未寄出' }}<template v-if="letter.readTime"> · 读于 {{ letter.readTime }}</template></div>
+          <div v-if="letter.arrivalTime" class="env-line faint">预计 {{ letter.arrivalTime }} 送达</div>
           <div v-if="letter.stampName || letter.envelopeName" class="env-line faint">
             <template v-if="letter.stampName">邮票「{{ letter.stampName }}」</template>
             <template v-if="letter.envelopeName"> · 信封「{{ letter.envelopeName }}」</template>

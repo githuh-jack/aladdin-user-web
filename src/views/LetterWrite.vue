@@ -10,15 +10,15 @@
         <span class="paper-label">寄给</span>
         <div class="seg receiver-seg">
           <button type="button" class="seg-item" :class="{ on: receiverType === 'friend' }" @click="receiverType = 'friend'">好友</button>
-          <button type="button" class="seg-item" :class="{ on: receiverType === 'id' }" @click="receiverType = 'id'">用户ID</button>
+          <button type="button" class="seg-item" :class="{ on: receiverType === 'no' }" @click="receiverType = 'no'">编号</button>
           <button type="button" class="seg-item" :class="{ on: receiverType === 'random' }" @click="receiverType = 'random'">随机</button>
         </div>
         <el-select v-if="receiverType === 'friend'" v-model="form.receiverId" placeholder="选择一位好友" filterable
                    size="default" clearable style="flex: 1" :teleported="false">
           <el-option v-for="f in friends" :key="f.friendId" :label="f.friendName" :value="f.friendId" />
         </el-select>
-        <el-input v-else-if="receiverType === 'id'" v-model.number="form.receiverId"
-                  type="number" placeholder="输入对方用户ID" style="flex: 1" clearable />
+        <el-input v-else-if="receiverType === 'no'" v-model.trim="form.receiverNo"
+                  maxlength="6" placeholder="输入对方6位编号" style="flex: 1" clearable />
         <span v-else class="random-hint">系统将随机挑选一位有缘人寄出</span>
       </div>
       <div class="paper-row">
@@ -41,6 +41,7 @@
           <template v-if="selectedStamp">{{ selectedStamp.stampName }}</template>
           <template v-else>贴邮票 +</template>
         </div>
+        <div v-if="selectedStamp" class="stamp-days">约{{ selectedStamp.deliveryDays || 3 }}天达</div>
       </div>
     </div>
 
@@ -50,7 +51,7 @@
       <div class="chip-row">
         <span v-for="e in myEnvelopes" :key="e.envelopeId" class="chip"
               :class="{ on: form.envelopeId === e.envelopeId }" @click="toggleEnvelope(e)">
-          {{ e.envelopeName }} ×{{ e.count }}
+          {{ e.envelopeName }} ×{{ e.available }}
         </span>
       </div>
     </div>
@@ -61,19 +62,19 @@
       <el-button round size="large" type="primary" @click="send('send')">折入信封 · 寄出</el-button>
     </div>
 
-    <!-- 贴邮票弹窗：选择可用邮票 -->
+    <!-- 贴邮票弹窗：选择可用邮票(寄出必须贴邮票) -->
     <el-dialog v-model="stampDialog" title="选择邮票" width="92%" style="max-width: 520px">
       <div v-if="availableStamps.length" class="stamp-grid">
         <div v-for="s in availableStamps" :key="s.stampId" class="stamp-option"
              :class="{ on: form.stampId === s.stampId }" @click="pickStamp(s)">
           <div class="stamp-option-icon">✉</div>
           <div class="stamp-option-name">{{ s.stampName }}</div>
-          <div class="stamp-option-meta">{{ s.stampTheme || '经典' }} · 余 {{ s.count }}</div>
+          <div class="stamp-option-meta">{{ s.stampTheme || '经典' }} · 余 {{ s.available }}</div>
+          <div class="stamp-option-meta">约 {{ s.deliveryDays || 3 }} 天送达</div>
         </div>
       </div>
       <div v-else class="empty-poem">没有可用邮票，去集市购买吧。</div>
       <template #footer>
-        <el-button round @click="clearStamp">不贴邮票</el-button>
         <el-button round type="primary" @click="stampDialog = false">确定</el-button>
       </template>
     </el-dialog>
@@ -94,6 +95,7 @@ const myEnvelopes = ref([])
 
 const form = reactive({
   receiverId: null,
+  receiverNo: '',
   title: '',
   content: '',
   stampId: null,
@@ -101,21 +103,17 @@ const form = reactive({
   action: 'send'
 })
 
-// 收件方式: friend=好友 id=用户ID random=随机
+// 收件方式: friend=好友 no=唯一编号 random=随机
 const receiverType = ref('friend')
 // 贴邮票弹窗
 const stampDialog = ref(false)
 
 const selectedStamp = computed(() => myStamps.value.find(s => s.stampId === form.stampId))
-// 可用邮票(count>0)
-const availableStamps = computed(() => myStamps.value.filter(s => s.count > 0))
+// 可用邮票(可用数量>0，已用完的模板不再出现)
+const availableStamps = computed(() => myStamps.value.filter(s => (s.available || 0) > 0))
 
 const pickStamp = (s) => {
   form.stampId = form.stampId === s.stampId ? null : s.stampId
-}
-const clearStamp = () => {
-  form.stampId = null
-  stampDialog.value = false
 }
 const toggleEnvelope = (e) => {
   form.envelopeId = form.envelopeId === e.envelopeId ? null : e.envelopeId
@@ -127,13 +125,22 @@ const send = async (action) => {
     ElMessage.warning('请选择收件人')
     return
   }
-  if (action === 'send' && receiverType.value === 'id' && !form.receiverId) {
-    ElMessage.warning('请输入对方用户ID')
+  if (action === 'send' && receiverType.value === 'no' && !form.receiverNo) {
+    ElMessage.warning('请输入对方6位编号')
     return
   }
-  // 寄出才要求标题，草稿可不填
-  if (action === 'send' && !form.title.trim()) { ElMessage.warning('请填写标题'); return }
+  // 寄出必须贴邮票(标题可不填)
+  if (action === 'send' && !form.stampId) {
+    ElMessage.warning('请先贴上一枚邮票')
+    stampDialog.value = true
+    return
+  }
   const payload = { ...form }
+  if (receiverType.value === 'no') {
+    // 按唯一编号寄信
+    payload.receiverNo = form.receiverNo
+    payload.receiverId = null
+  }
   if (receiverType.value === 'random') {
     payload.receiverId = null
     payload.random = true
@@ -147,7 +154,7 @@ const send = async (action) => {
 onMounted(async () => {
   try { const r = await friendApi.list(); friends.value = r.data || [] } catch {}
   try { const r = await stampApi.mine(); myStamps.value = r.data || [] } catch {}
-  try { const r = await envelopeApi.mine(); myEnvelopes.value = r.data || [] } catch {}
+  try { const r = await envelopeApi.mine(); myEnvelopes.value = (r.data || []).filter(e => (e.available || 0) > 0) } catch {}
   if (route.query.receiverId) form.receiverId = Number(route.query.receiverId)
 })
 </script>
@@ -219,6 +226,13 @@ onMounted(async () => {
 .stamp-box.empty { color: var(--ink-faint); }
 .stamp-box { cursor: pointer; }
 .stamp-box:hover { filter: brightness(0.98); }
+.stamp-days {
+  margin-top: 4px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
 
 .stamp-grid {
   display: grid;

@@ -105,6 +105,8 @@ const navMenus = [
 
 const adminMenus = [
   { path: '/admin/letters', title: '信件' },
+  { path: '/admin/announcements', title: '公告' },
+  { path: '/admin/mails', title: '系统邮件' },
   { path: '/admin/friends', title: '好友' },
   { path: '/admin/diary', title: '日记' },
   { path: '/admin/notes', title: '话题' },
