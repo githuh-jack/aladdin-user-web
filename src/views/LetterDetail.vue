@@ -5,13 +5,21 @@
     </div>
 
     <div v-loading="loading">
+      <!-- 已退回提示 -->
+      <div v-if="letter.status === 4" class="return-banner">
+        ✉ 这封信已退回寄件人<template v-if="letter.returnReason">（{{ letter.returnReason }}）</template>
+      </div>
+
       <!-- 信封头 -->
       <div class="envelope-head">
         <div class="env-stamp">
           <span class="env-stamp-inner">邮</span>
         </div>
         <div class="env-meta">
-          <div class="env-title">{{ letter.title || '(无标题)' }}</div>
+          <div class="env-title-row">
+            <div class="env-title">{{ letter.title || '(无标题)' }}</div>
+            <el-button v-if="canRefuse" round size="small" type="warning" plain @click="refuse">拒收</el-button>
+          </div>
           <div class="env-line">{{ letter.senderName }} → {{ letter.receiverName || letter.receiverAddress || '收件地址待填' }}</div>
           <div class="env-line faint">{{ letter.sendTime || '尚未寄出' }}<template v-if="letter.readTime"> · 读于 {{ letter.readTime }}</template></div>
           <div v-if="letter.arrivalTime" class="env-line faint">预计 {{ letter.arrivalTime }} 送达</div>
@@ -33,14 +41,38 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { letterApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
+const userStore = useUserStore()
 const letter = ref({})
 const loading = ref(false)
+
+// 可拒收：我收到的、未读(已发送)、已到达的普通信件
+const canRefuse = computed(() => {
+  const l = letter.value
+  return l.id &&
+    String(l.senderId) !== String(userStore.userId) &&
+    l.status === 1 &&
+    (!l.arrivalTime || new Date(l.arrivalTime) <= new Date())
+})
+
+// 拒收：信件按邮票送达时长退回寄件人
+const refuse = async () => {
+  await ElMessageBox.confirm('拒收后这封信将退回寄件人，确定拒收吗？', '拒收信件', { type: 'warning' })
+  await letterApi.refuse(letter.value.id)
+  ElMessage.success('已拒收，信件正在退回寄件人')
+  loading.value = true
+  try {
+    const r = await letterApi.detail(route.params.id)
+    letter.value = r.data || {}
+  } finally { loading.value = false }
+}
 
 onMounted(async () => {
   loading.value = true
@@ -62,6 +94,17 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 .back-row:active { color: var(--accent); }
+
+/* 已退回横幅 */
+.return-banner {
+  background: #fdeeee;
+  border: 1px solid #e6b8b8;
+  color: #a34f2c;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
 
 .envelope-head {
   background: var(--paper-card);
@@ -97,6 +140,7 @@ onMounted(async () => {
   justify-content: center;
 }
 .env-meta { flex: 1; min-width: 0; }
+.env-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .env-title { font-family: var(--serif); font-weight: 700; font-size: 17px; color: var(--ink); }
 .env-line { font-size: 12px; color: var(--ink-soft); margin-top: 5px; }
 .env-line.faint { color: var(--ink-faint); }

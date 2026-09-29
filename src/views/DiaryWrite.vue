@@ -4,10 +4,8 @@
       <span class="poetic-title">{{ isEdit ? '改一页日记' : '写一篇日记' }}</span>
     </div>
 
-    <!-- 日记纸 -->
+    <!-- 日记纸(无标题，直接落笔) -->
     <div class="diary-paper">
-      <el-input v-model="form.title" placeholder="这一页的标题" borderless
-                class="title-input" maxlength="50" />
       <el-input
         v-model="form.content"
         type="textarea"
@@ -92,7 +90,6 @@ const today = () => {
 }
 
 const form = reactive({
-  title: '',
   content: '',
   mood: '',
   weather: '',
@@ -101,7 +98,7 @@ const form = reactive({
 })
 
 const save = async () => {
-  if (!form.title.trim()) { ElMessage.warning('给这一页起个标题吧'); return }
+  if (!form.content.trim()) { ElMessage.warning('写点什么再收好吧'); return }
   saving.value = true
   try {
     if (isEdit.value) {
@@ -125,7 +122,6 @@ onMounted(async () => {
       const r = await diaryApi.list({ page: 1, limit: 100 })
       const d = (r.data || []).find(x => String(x.id) === String(route.query.id))
       if (d) {
-        form.title = d.title || ''
         form.content = d.content || ''
         form.mood = d.mood || ''
         form.weather = d.weather || ''
@@ -149,17 +145,6 @@ onMounted(async () => {
   padding: 18px 16px 64px;
   position: relative;
   box-shadow: 0 2px 10px rgba(140, 116, 80, 0.08);
-}
-.title-input :deep(.el-input__wrapper) {
-  background: transparent;
-  box-shadow: none !important;
-  padding-left: 0;
-}
-.title-input :deep(.el-input__inner) {
-  font-family: var(--serif);
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--ink);
 }
 .content-input { margin-top: 6px; }
 .content-input :deep(.el-textarea__inner) {

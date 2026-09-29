@@ -28,7 +28,10 @@
         <div class="coin-emoji">◯</div>
         <div class="coin-value">{{ balance }} <small>文</small></div>
         <div class="coin-label">当前铜钱</div>
-        <el-button round type="primary" size="small" @click="$router.push('/shop')">去商店</el-button>
+        <div style="display: flex; gap: 8px; justify-content: center">
+          <el-button round type="primary" size="small" @click="$router.push('/shop')">去商店</el-button>
+          <el-button round size="small" @click="redeemVisible = true">兑换码</el-button>
+        </div>
       </div>
     </div>
 
@@ -44,7 +47,7 @@
       </div>
       <div class="stat-item paper-card">
         <div class="stat-num">{{ myEnvelopes.length }}</div>
-        <div class="stat-label">信封种类</div>
+        <div class="stat-label">信纸种类</div>
       </div>
       <div class="stat-item paper-card">
         <div class="stat-num">{{ orders.length }}</div>
@@ -54,6 +57,10 @@
         <div class="stat-num">{{ logs.length }}</div>
         <div class="stat-label">流水条数</div>
       </div>
+      <div class="stat-item paper-card" title="每寄出一封信收获一颗小星星">
+        <div class="stat-num">✦ {{ starCount }}</div>
+        <div class="stat-label">小星星</div>
+      </div>
     </div>
 
     <!-- 我的资产与记录 -->
@@ -62,7 +69,7 @@
     </div>
     <div class="seg" style="margin-bottom: 14px">
       <button class="seg-item" :class="{ on: activeTab === 'stamps' }" @click="activeTab = 'stamps'">我的邮票</button>
-      <button class="seg-item" :class="{ on: activeTab === 'envelopes' }" @click="activeTab = 'envelopes'">我的信封</button>
+      <button class="seg-item" :class="{ on: activeTab === 'envelopes' }" @click="activeTab = 'envelopes'">我的信纸</button>
       <button class="seg-item" :class="{ on: activeTab === 'logs' }" @click="activeTab = 'logs'">铜钱流水</button>
       <button class="seg-item" :class="{ on: activeTab === 'orders' }" @click="activeTab = 'orders'">购买订单</button>
     </div>
@@ -104,51 +111,67 @@
       </template>
     </div>
 
-    <!-- 我的信封 -->
+    <!-- 我的信纸 -->
     <div v-else-if="activeTab === 'envelopes'" class="goods-grid">
       <div v-for="e in myEnvelopes" :key="e.envelopeId" class="paper-card goods-card">
-        <div class="goods-envelope"><span>✉</span></div>
+        <div class="goods-envelope"><span>📜</span></div>
         <div class="goods-name">{{ e.envelopeName }}</div>
         <div class="goods-tag">可用 {{ e.available }}<template v-if="e.used"> · 已用 {{ e.used }}</template></div>
         <el-button round size="small" @click="viewImage(e.envelopeImageUrl, e.envelopeName)">查看</el-button>
       </div>
-      <div v-if="!myEnvelopes.length" class="empty-poem">还没有信封，去商店挑一个吧。</div>
+      <div v-if="!myEnvelopes.length" class="empty-poem">还没有信纸，去商店挑一张吧。</div>
     </div>
 
-    <!-- 铜钱流水 -->
-    <div v-else-if="activeTab === 'logs'">
-      <div v-for="log in logs" :key="log.id" class="paper-card log-card">
-        <div class="log-left">
-          <div class="log-type">{{ log.logType }}</div>
-          <div class="log-time">{{ log.sys001 }}</div>
-          <div class="log-remark">{{ log.remark || '' }}</div>
+    <!-- 铜钱流水：单列横向账单式 -->
+    <div v-else-if="activeTab === 'logs'" class="stmt-list">
+      <div v-for="log in logs" :key="log.id" class="paper-card stmt-row">
+        <div class="stmt-main">
+          <div class="stmt-title">
+            <span class="log-type">{{ logTypeText(log.logType) }}</span>
+            <span v-if="log.remark" class="log-remark">{{ log.remark }}</span>
+          </div>
+          <div class="stmt-time">{{ log.sys001 }}</div>
         </div>
-        <div class="log-right">
+        <div class="stmt-right">
           <div :class="['log-amt', log.changeAmount >= 0 ? 'plus' : 'minus']">
             {{ log.changeAmount >= 0 ? '+' : '' }}{{ log.changeAmount }}
           </div>
           <div class="log-bal">余 {{ log.balanceAfter }}</div>
         </div>
       </div>
-      <div v-if="!logs.length" class="empty-poem">还没有铜钱变动。</div>
+      <div v-if="!logs.length" class="empty-poem">最近一个月还没有铜钱变动。</div>
     </div>
 
-    <!-- 购买订单 -->
-    <div v-else-if="activeTab === 'orders'">
-      <div v-for="o in orders" :key="o.id" class="paper-card order-card">
-        <div class="order-head">
-          <span class="order-type">{{ o.itemType === 'stamp' ? '邮票' : o.itemType === 'envelope' ? '信封' : o.itemType }}</span>
-          <el-tag v-if="o.status === 1" size="small" type="success">已完成</el-tag>
-          <el-tag v-else-if="o.status === 0" size="small" type="info">待处理</el-tag>
-          <el-tag v-else size="small" type="danger">失败</el-tag>
+    <!-- 购买订单：单列横向，点开展示详情 -->
+    <div v-else-if="activeTab === 'orders'" class="stmt-list">
+      <div v-for="o in orders" :key="o.id" class="paper-card stmt-row order-row" @click="toggleOrder(o.id)">
+        <div class="stmt-main">
+          <div class="stmt-title">
+            <span class="order-type">{{ typeText(o.itemType) }}</span>
+            <span class="order-name">{{ o.itemName }} × {{ o.quantity }}</span>
+          </div>
+          <div class="stmt-time">{{ o.sys001 }}</div>
         </div>
-        <div class="order-name">{{ o.itemName }} × {{ o.quantity }}</div>
-        <div class="order-bottom">
-          <span class="order-price">{{ o.totalPrice }} 文</span>
-          <span class="order-time">{{ o.sys001 }}</span>
+        <div class="stmt-right">
+          <div class="order-price">-{{ o.totalPrice }} 文</div>
+          <div class="order-state">
+            <el-tag v-if="o.status === 1" size="small" type="success">已完成</el-tag>
+            <el-tag v-else-if="o.status === 2" size="small" type="info">已退款</el-tag>
+            <el-tag v-else size="small" type="warning">待处理</el-tag>
+            <span class="order-arrow">{{ expandedOrderId === o.id ? '▲' : '▼' }}</span>
+          </div>
+        </div>
+        <div v-if="expandedOrderId === o.id" class="order-detail" @click.stop>
+          <div class="order-detail-item"><span>订单号</span><b>{{ o.id }}</b></div>
+          <div class="order-detail-item"><span>商品类型</span><b>{{ typeText(o.itemType) }}</b></div>
+          <div class="order-detail-item"><span>商品编号</span><b>{{ o.itemId }}</b></div>
+          <div class="order-detail-item"><span>单价</span><b>{{ o.unitPrice }} 文</b></div>
+          <div class="order-detail-item"><span>数量</span><b>{{ o.quantity }}</b></div>
+          <div class="order-detail-item"><span>总价</span><b>{{ o.totalPrice }} 文</b></div>
+          <div class="order-detail-item"><span>下单时间</span><b>{{ o.sys001 }}</b></div>
         </div>
       </div>
-      <div v-if="!orders.length" class="empty-poem">暂无订单。</div>
+      <div v-if="!orders.length" class="empty-poem">最近一个月暂无订单。</div>
     </div>
 
     <!-- 好友管理 -->
@@ -216,6 +239,16 @@
       </template>
     </el-dialog>
 
+    <!-- 兑换码 -->
+    <el-dialog v-model="redeemVisible" title="兑换码" width="92%" style="max-width: 400px" @closed="redeemCode = ''">
+      <el-input v-model="redeemCode" placeholder="请输入兑换码" maxlength="32" clearable @keyup.enter="submitRedeem" />
+      <div class="avatar-edit-sub" style="margin-top: 8px">每个兑换码每位旅人仅可兑换一次</div>
+      <template #footer>
+        <el-button round @click="redeemVisible = false">取消</el-button>
+        <el-button round type="primary" :loading="redeeming" @click="submitRedeem">兑换</el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -223,13 +256,14 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi, authApi } from '@/api'
+import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi, authApi, redeemApi } from '@/api'
 import Friends from './Friends.vue'
 
 const userStore = useUserStore()
 const avatarChar = computed(() => (userStore.realName || userStore.username || '客').slice(0, 1))
 // 用户唯一编号(邮寄信件凭编号)
 const userNo = ref('')
+const starCount = ref(0)
 
 const loading = ref(false)
 const activeTab = ref('stamps')
@@ -240,6 +274,48 @@ const myStamps = ref([])
 const myEnvelopes = ref([])
 const orders = ref([])
 const logs = ref([])
+// 订单展开详情
+const expandedOrderId = ref(null)
+const toggleOrder = (id) => {
+  expandedOrderId.value = expandedOrderId.value === id ? null : id
+}
+const typeText = (t) => (t === 'stamp' ? '邮票' : t === 'envelope' ? '信纸' : (t || '商品'))
+
+// 铜钱流水类型中文
+const logTypeMap = {
+  recharge: '充值',
+  shop: '商店购买',
+  send_letter: '寄信',
+  admin_adjust: '管理员调整',
+  mail: '系统邮件',
+  redeem: '兑换码',
+  reward: '签到奖励',
+  register: '注册奖励'
+}
+const logTypeText = (t) => logTypeMap[t] || (t || '其他')
+
+// 兑换码
+const redeemVisible = ref(false)
+const redeemCode = ref('')
+const redeeming = ref(false)
+async function submitRedeem() {
+  const code = redeemCode.value.trim()
+  if (!code) {
+    ElMessage.warning('请输入兑换码')
+    return
+  }
+  redeeming.value = true
+  try {
+    const res = await redeemApi.exchange(code)
+    const amount = res?.data?.coinAmount || 0
+    const stampName = res?.data?.stampName
+    ElMessage.success(stampName ? `兑换成功，${amount} 文铜钱已到账，并获赠邮票「${stampName}」×1` : `兑换成功，${amount} 文铜钱已到账`)
+    redeemVisible.value = false
+    loadAll()
+  } finally {
+    redeeming.value = false
+  }
+}
 
 // 成套邮票按套系主题分组；散票为未填套系的邮票
 const stampSeriesGroups = computed(() => {
@@ -432,10 +508,11 @@ const loadAll = async () => {
     loadFriendCount()
     loadProfile()
     loadInvite()
-    // 唯一编号
+    // 唯一编号 + 小星星累计
     try {
       const r = await authApi.userInfo()
       userNo.value = r.data?.userNo || ''
+      starCount.value = r.data?.starCount ?? 0
     } catch {}
   } finally { loading.value = false }
 }
@@ -665,19 +742,33 @@ onMounted(loadAll)
 .series-item-info { flex: 1; min-width: 0; }
 .series-item-info .goods-tag { margin: 4px 0 0; }
 
-.log-card, .order-card { margin-bottom: 10px; }
-.log-card { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 14px; }
-.log-type { font-family: var(--serif); font-weight: 600; font-size: 14px; }
-.log-time { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
-.log-remark { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
-.log-right { text-align: right; }
+/* 流水/订单：单列横向账单式 */
+.stmt-list { display: flex; flex-direction: column; gap: 10px; }
+.stmt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+}
+.stmt-main { flex: 1; min-width: 0; }
+.stmt-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.stmt-time { font-size: 11px; color: var(--ink-faint); margin-top: 3px; }
+.stmt-right { text-align: right; flex-shrink: 0; }
+
+.log-type {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 14px;
+}
+.log-remark { font-size: 12px; color: var(--ink-soft); }
 .log-amt { font-family: var(--serif); font-weight: 700; font-size: 16px; }
 .log-amt.plus { color: #6b9c4e; }
 .log-amt.minus { color: var(--accent); }
 .log-bal { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
 
-.order-card { padding: 12px 14px; }
-.order-head { display: flex; align-items: center; justify-content: space-between; }
+.order-row { cursor: pointer; }
 .order-type {
   font-size: 10px;
   color: var(--accent);
@@ -686,10 +777,26 @@ onMounted(loadAll)
   border-radius: 999px;
   padding: 1px 8px;
 }
-.order-name { font-family: var(--serif); font-weight: 600; margin-top: 8px; }
-.order-bottom { display: flex; justify-content: space-between; margin-top: 8px; }
-.order-price { color: var(--gold); font-weight: 700; }
-.order-time { font-size: 11px; color: var(--ink-faint); }
+.order-name { font-family: var(--serif); font-weight: 600; font-size: 14px; }
+.order-price { color: var(--gold); font-weight: 700; font-family: var(--serif); }
+.order-state { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.order-arrow { font-size: 10px; color: var(--ink-faint); }
+.order-detail {
+  width: 100%;
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+  margin-top: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 16px;
+}
+.order-detail-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.order-detail-item b { color: var(--ink); font-weight: 600; }
 
 .empty-poem { text-align: center; font-family: var(--serif); color: var(--ink-faint); font-size: 13px; padding: 40px 0; letter-spacing: 1px; grid-column: 1 / -1; }
 

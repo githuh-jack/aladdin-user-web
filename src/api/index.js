@@ -44,6 +44,8 @@ request.interceptors.response.use(
 export const authApi = {
   login: (data) => request.post('/biz/auth/login', data),
   register: (data) => request.post('/biz/auth/register', data),
+  sendEmailCode: (email, scene = 'register') => request.post('/biz/auth/send-code', { email, scene }),
+  resetPassword: (data) => request.post('/biz/auth/reset-password', data),
   logout: () => request.post('/biz/auth/logout'),
   userInfo: () => request.get('/biz/auth/me'),
   userDetail: () => request.get('/biz/auth/me')
@@ -67,9 +69,11 @@ export const letterApi = {
   write: (data) => request.post('/biz/letter/write', data),
   list: (params) => request.get('/biz/letter/list', { params }),
   publicWriters: () => request.get('/biz/letter/public/writers'),
+  publicLetters: () => request.get('/biz/letter/public/list'),
   sent: (params) => request.get('/biz/letter/sent', { params }),
   inbox: (params) => request.get('/biz/letter/inbox', { params }),
   detail: (id) => request.get(`/biz/letter/detail/${id}`),
+  refuse: (id) => request.post(`/biz/letter/refuse/${id}`),
   remove: (id) => request.post(`/biz/letter/remove/${id}`)
 }
 
@@ -143,6 +147,11 @@ export const shopApi = {
   buy: (data) => request.post('/biz/shop/buy', data)
 }
 
+// 兑换码
+export const redeemApi = {
+  exchange: (code) => request.post('/biz/redeem/exchange', { code })
+}
+
 // 公告
 export const announcementApi = {
   published: () => request.get('/biz/announcement/published')
@@ -180,8 +189,6 @@ export const adminApi = {
   coinOrders: (params) => request.get('/biz/coin/admin/orders', { params }),
   coinAdjust: (data) => request.post('/biz/coin/admin/adjust', data),
   loginLogs: (params) => request.get('/biz/log/admin/login', { params }),
-  bambooList: (params) => request.get('/biz/bamboo/admin/list', { params }),
-  bambooLogs: (params) => request.get('/biz/bamboo/admin/logs', { params }),
   configList: () => request.get('/biz/config/admin/list'),
   configSave: (data) => request.post('/biz/config/admin/save', data)
 }

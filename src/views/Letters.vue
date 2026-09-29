@@ -8,36 +8,23 @@
           <button class="seg-item" :class="{ on: activeTab === 'all' }" @click="switchTab('all')">全部</button>
           <button class="seg-item" :class="{ on: activeTab === 'inbox' }" @click="switchTab('inbox')">收到的</button>
           <button class="seg-item" :class="{ on: activeTab === 'sent' }" @click="switchTab('sent')">寄出的</button>
-          <button class="seg-item" :class="{ on: activeTab === 'sys' }" @click="switchTab('sys')">系统</button>
         </div>
       </div>
     </div>
 
-    <!-- 系统邮件 -->
-    <div v-if="activeTab === 'sys'" v-loading="loading" class="mail-grid">
-      <div v-for="m in mails" :key="m.id" class="mail-card" @click="openMail(m)">
-        <div class="mail-head">
-          <span class="mail-badge">系</span>
-          <div class="mail-title">
-            <i v-if="!m.claimed" class="unread-dot"></i>
-            {{ m.title }}
-          </div>
-          <el-tag v-if="m.claimed" size="small" type="success" class="env-tag">已领取</el-tag>
-          <el-tag v-else size="small" type="warning" class="env-tag">待领取</el-tag>
-        </div>
-        <div class="mail-content">{{ m.content }}</div>
-        <div class="mail-attach">附赠：{{ attachText(m) }}</div>
-        <div class="mail-date">{{ m.sendTime || '' }}</div>
-      </div>
-      <div v-if="!loading && !mails.length" class="empty-poem">暂无系统邮件。</div>
+    <!-- 未读提示 -->
+    <div v-if="unreadCount > 0" class="unread-banner" @click="switchTab('inbox')">
+      📬 你有 {{ unreadCount }} 封未读信件，点击查看
     </div>
 
-    <div v-else v-loading="loading" class="env-grid">
-      <div v-for="item in list" :key="item.id" class="envelope" @click="$router.push(`/letters/${item.id}`)">
+    <div v-loading="loading" class="env-grid">
+      <div v-for="item in list" :key="item.isSys ? `sys-${item.id}` : item.id" class="envelope"
+           :class="item.isSys ? 'env-sys' : (isMineSent(item) ? 'env-sent' : 'env-recv')"
+           @click="openItem(item)">
         <div class="env-flap"></div>
         <div class="env-body">
           <div class="env-stamp">
-            <span class="env-stamp-inner">邮</span>
+            <span class="env-stamp-inner">{{ item.isSys ? '系' : '邮' }}</span>
           </div>
           <div class="env-main">
             <div class="env-title">
@@ -45,21 +32,29 @@
               {{ item.title || '(无标题)' }}
             </div>
             <div class="env-addr">
-              <template v-if="isMineSent(item)">
+              <template v-if="item.isSys">
+                系统寄给我的
+              </template>
+              <template v-else-if="isMineSent(item)">
                 寄给 {{ item.receiverName || item.receiverAddress || '未指定收件人' }}
               </template>
               <template v-else>
                 {{ item.senderName }} 寄给我的
               </template>
-              <el-tag v-if="item.status === 0" size="small" type="info" class="env-tag">草稿</el-tag>
+              <el-tag v-if="item.isSys" size="small" :type="item.claimed ? 'success' : 'warning'" class="env-tag">
+                {{ item.claimed ? '已领取' : '待领取' }}
+              </el-tag>
+              <el-tag v-else-if="item.status === 0" size="small" type="info" class="env-tag">草稿</el-tag>
               <el-tag v-else-if="inTransit(item)" size="small" type="warning" class="env-tag">送信中</el-tag>
+              <el-tag v-else-if="item.status === 4" size="small" type="danger" class="env-tag">{{ returnText(item) }}</el-tag>
               <el-tag v-else-if="isMineSent(item) && item.status === 2" size="small" type="success" class="env-tag">已读</el-tag>
             </div>
             <div class="env-date">
               {{ item.sendTime || '尚未寄出' }}
             </div>
           </div>
-          <el-icon class="env-del" @click.stop="remove(item.id)"><Delete /></el-icon>
+          <span v-if="canRefuse(item)" class="env-refuse" @click.stop="refuse(item)">拒收</span>
+          <el-icon v-if="!item.isSys" class="env-del" @click.stop="remove(item.id)"><Delete /></el-icon>
         </div>
       </div>
     </div>
@@ -82,17 +77,18 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { letterApi, sysMailApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
+const router = useRouter()
 const userStore = useUserStore()
 const activeTab = ref('all')
 const list = ref([])
 const loading = ref(false)
-// 系统邮件
-const mails = ref([])
+// 系统邮件详情弹窗
 const mailDialog = ref(false)
 const currentMail = ref(null)
 
@@ -113,25 +109,56 @@ const attachText = (m) => {
 
 // 是否我寄出的
 const isMineSent = (item) => String(item.senderId) === String(userStore.userId)
-// 未读：我收到的且未读
-const isUnread = (item) =>
-  !isMineSent(item) && item.status === 1 &&
-  (!item.arrivalTime || new Date(item.arrivalTime) <= new Date())
+// 未读：系统邮件未领取 / 我收到的且未读
+const isUnread = (item) => {
+  if (item.isSys) return !item.claimed
+  return !isMineSent(item) && item.status === 1 &&
+    (!item.arrivalTime || new Date(item.arrivalTime) <= new Date())
+}
 // 在途：已寄出且还没到到达时间
 const inTransit = (item) =>
-  item.status >= 1 && item.arrivalTime && new Date(item.arrivalTime) > new Date()
+  !item.isSys && item.status >= 1 && item.arrivalTime && new Date(item.arrivalTime) > new Date()
+
+// 已退回/退回中文案(含原因)
+const returnText = (item) => {
+  const arrived = !item.returnTime || new Date(item.returnTime) <= new Date()
+  const prefix = arrived ? '已退回' : '退回中'
+  return item.returnReason ? `${prefix}·${item.returnReason}` : prefix
+}
+
+// 可拒收：我收到的、未读、已到达的普通信件
+const canRefuse = (item) =>
+  !item.isSys && !isMineSent(item) && item.status === 1 &&
+  (!item.arrivalTime || new Date(item.arrivalTime) <= new Date())
+
+// 未读信件数(含未领取的系统邮件)
+const unreadCount = computed(() => list.value.filter(i => isUnread(i)).length)
 
 const load = async () => {
   loading.value = true
   try {
-    if (activeTab.value === 'sys') {
-      const r = await sysMailApi.list()
-      mails.value = r.data || []
-      return
-    }
     const r = await letterApi.list({ box: activeTab.value, page: 1, limit: 50 })
-    list.value = r.data.items || []
+    let items = (r.data.items || []).map(i => ({ ...i, isSys: false }))
+    // 系统邮件并入全部/收到列表(来源标记为系统，点击弹窗查看)
+    if (activeTab.value !== 'sent') {
+      try {
+        const sr = await sysMailApi.list()
+        const sysItems = (sr.data || []).map(m => ({
+          ...m,
+          isSys: true,
+          senderName: '系统'
+        }))
+        items = [...sysItems, ...items]
+      } catch {}
+    }
+    list.value = items
   } finally { loading.value = false }
+}
+
+// 点击卡片：系统邮件走弹窗，普通信件跳详情
+const openItem = (item) => {
+  if (item.isSys) openMail(item)
+  else router.push(`/letters/${item.id}`)
 }
 
 // 打开系统邮件详情，读取时直接领取附赠
@@ -156,6 +183,14 @@ const claimMail = async () => {
     currentMail.value.claimTime = new Date().toLocaleString()
     if (r.msg) ElMessage.success(r.msg)
   } catch {}
+}
+
+// 拒收：信件按邮票送达时长退回寄件人
+const refuse = async (item) => {
+  await ElMessageBox.confirm('拒收后这封信将退回寄件人，确定拒收吗？', '拒收信件', { type: 'warning' })
+  await letterApi.refuse(item.id)
+  ElMessage.success('已拒收，信件正在退回寄件人')
+  load()
 }
 
 const switchTab = (t) => {
@@ -193,6 +228,20 @@ onMounted(load)
   transition: transform .1s;
 }
 .envelope:active { transform: scale(0.98); }
+/* 收到的信(暖金) 与 寄出的信(青绿) 双色区分 */
+.envelope.env-recv {
+  background: #fdf6e5;
+  border-left: 4px solid #d9a441;
+}
+.envelope.env-sent {
+  background: #eef6ec;
+  border-left: 4px solid #6f9e63;
+}
+/* 系统邮件(淡紫) */
+.envelope.env-sys {
+  background: #f3f0fa;
+  border-left: 4px solid #9a86c8;
+}
 .env-flap {
   height: 14px;
   background: linear-gradient(135deg, var(--paper-deep) 0%, transparent 50%),
@@ -246,6 +295,14 @@ onMounted(load)
 .env-date { font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
 .env-del { color: var(--ink-faint); cursor: pointer; padding: 2px; }
 .env-del:hover { color: var(--accent); }
+.env-refuse {
+  font-size: 12px;
+  color: #c0704d;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+.env-refuse:hover { color: #a34f2c; text-decoration: underline; }
 .empty-poem {
   text-align: center;
   font-family: var(--serif);
@@ -255,56 +312,19 @@ onMounted(load)
   letter-spacing: 1px;
 }
 
-/* 系统邮件 */
-.mail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: start; }
-.mail-card {
-  background: var(--paper-card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 14px 16px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(140, 116, 80, 0.08);
-  transition: transform .1s;
-}
-.mail-card:active { transform: scale(0.98); }
-.mail-head { display: flex; align-items: center; gap: 8px; }
-.mail-badge {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
+/* 未读提示 */
+.unread-banner {
   background: var(--accent-soft);
-  color: var(--accent);
-  font-family: var(--serif);
-  font-weight: 700;
+  border: 1px solid var(--soft-border);
+  border-radius: 12px;
+  padding: 10px 14px;
   font-size: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.mail-title {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--serif);
+  color: var(--accent);
+  cursor: pointer;
+  margin-bottom: 12px;
   font-weight: 600;
-  font-size: 15px;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
-.mail-content {
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin-top: 8px;
-  line-height: 1.7;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.mail-attach { font-size: 11px; color: var(--accent); margin-top: 8px; }
-.mail-date { font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+
 .mail-detail-content { font-size: 14px; color: var(--ink-soft); line-height: 1.9; white-space: pre-wrap; }
 .mail-detail-attach { font-size: 13px; color: var(--accent); margin-top: 14px; }
 .mail-detail-claimed { font-size: 12px; color: var(--ink-faint); margin-top: 8px; }

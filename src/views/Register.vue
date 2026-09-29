@@ -28,8 +28,16 @@
             {{ inviteCheck.valid ? `邀请码有效，将由「${inviteCheck.name}」邀请你登船` : '邀请码不存在，可留空或检查后重试' }}
           </div>
         </el-form-item>
-        <el-form-item label="邮箱(可选)">
-          <el-input v-model="form.email" placeholder="可选" />
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="form.email" placeholder="用于接收验证码" @blur="onEmailBlur" />
+        </el-form-item>
+        <el-form-item label="邮箱验证码" prop="emailCode">
+          <div class="code-row">
+            <el-input v-model="form.emailCode" placeholder="6位数字" maxlength="6" />
+            <el-button class="code-btn" :disabled="countdown > 0 || sending" @click="handleSendCode">
+              {{ countdown > 0 ? `${countdown}s后重发` : '获取验证码' }}
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="loading" style="width:100%" size="large" @click="handleRegister">注 册</el-button>
@@ -41,16 +49,20 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { inviteApi } from '@/api'
+import { inviteApi, authApi } from '@/api'
 
 const router = useRouter()
 const userStore = useUserStore()
 const formRef = ref()
 const loading = ref(false)
+// 验证码发送状态
+const sending = ref(false)
+const countdown = ref(0)
+let timer = null
 
 // 邀请码实时校验结果
 const inviteCheck = reactive({ done: false, valid: false, name: '' })
@@ -74,8 +86,42 @@ const form = reactive({
   confirm: '',
   nickname: '',
   inviteCode: '',
-  email: ''
+  email: '',
+  emailCode: ''
 })
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+const onEmailBlur = () => {
+  if (form.email && !EMAIL_RE.test(form.email.trim())) {
+    formRef.value?.validateField('email').catch(() => {})
+  }
+}
+
+// 发送邮箱验证码，成功后开始60s倒计时
+const handleSendCode = async () => {
+  try {
+    await formRef.value.validateField('email')
+  } catch (e) { return }
+  if (!EMAIL_RE.test(form.email.trim())) return
+  sending.value = true
+  try {
+    await authApi.sendEmailCode(form.email.trim())
+    ElMessage.success('验证码已发送，请查收邮箱')
+    countdown.value = 60
+    timer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) {
+        clearInterval(timer)
+        timer = null
+      }
+    }, 1000)
+  } catch (e) {
+    // 拦截器已弹错
+  } finally {
+    sending.value = false
+  }
+}
 
 const validatePass = (rule, value, callback) => {
   if (value !== form.password) callback(new Error('两次输入的密码不一致'))
@@ -101,6 +147,14 @@ const rules = {
   ],
   inviteCode: [
     { pattern: /^[A-Za-z0-9]{4,16}$/, message: '邀请码需为4-16位字母或数字', trigger: 'blur' }
+  ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { pattern: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: '邮箱格式不正确', trigger: 'blur' }
+  ],
+  emailCode: [
+    { required: true, message: '请输入邮箱验证码', trigger: 'blur' },
+    { pattern: /^\d{6}$/, message: '验证码为6位数字', trigger: 'blur' }
   ]
 }
 
@@ -114,7 +168,8 @@ const handleRegister = async () => {
         password: form.password,
         nickname: form.nickname,
         inviteCode: form.inviteCode,
-        email: form.email
+        email: form.email.trim(),
+        emailCode: form.emailCode.trim()
       })
       ElMessage.success('注册成功，请登录')
       router.push('/login')
@@ -125,6 +180,10 @@ const handleRegister = async () => {
     }
   })
 }
+
+onBeforeUnmount(() => {
+  if (timer) clearInterval(timer)
+})
 </script>
 
 <style scoped>
@@ -163,4 +222,6 @@ const handleRegister = async () => {
 .invite-tip { font-size: 12px; line-height: 1.6; margin-top: 4px; }
 .invite-ok { color: #67c23a; }
 .invite-bad { color: #c45656; }
+.code-row { display: flex; gap: 8px; width: 100%; }
+.code-btn { flex-shrink: 0; border-radius: 10px; }
 </style>

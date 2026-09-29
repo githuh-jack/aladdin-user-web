@@ -5,7 +5,9 @@
     </div>
 
     <!-- 信纸 -->
-    <div class="letter-paper">
+    <div class="letter-paper" :style="paperStyle">
+      <div v-if="selectedPaper" class="paper-mask"></div>
+      <div class="paper-inner">
       <div class="paper-row">
         <span class="paper-label">寄给</span>
         <div class="seg receiver-seg">
@@ -43,11 +45,12 @@
         </div>
         <div v-if="selectedStamp" class="stamp-days">约{{ selectedStamp.deliveryDays || 3 }}天达</div>
       </div>
+      </div>
     </div>
 
-    <!-- 选信封 -->
+    <!-- 选信纸 -->
     <div v-if="myEnvelopes.length" class="pick-block">
-      <div class="pick-title">我的信封</div>
+      <div class="pick-title">我的信纸<span class="pick-sub">（选一张作为写信的背景）</span></div>
       <div class="chip-row">
         <span v-for="e in myEnvelopes" :key="e.envelopeId" class="chip"
               :class="{ on: form.envelopeId === e.envelopeId }" @click="toggleEnvelope(e)">
@@ -56,10 +59,20 @@
       </div>
     </div>
 
+    <!-- 可见性 -->
+    <div class="pick-block meta-row">
+      <div>
+        <div class="pick-title">可见性</div>
+        <el-switch v-model="form.isPublic" :active-value="1" :inactive-value="0"
+                   active-text="公开" inactive-text="私密" />
+        <div class="pick-sub" style="margin-top: 4px">公开的信件会展示在信件广场</div>
+      </div>
+    </div>
+
     <!-- 操作 -->
     <div class="action-row">
       <el-button round size="large" @click="send('draft')">存为草稿</el-button>
-      <el-button round size="large" type="primary" @click="send('send')">折入信封 · 寄出</el-button>
+      <el-button round size="large" type="primary" @click="send('send')">折入信笺 · 寄出</el-button>
     </div>
 
     <!-- 贴邮票弹窗：选择可用邮票(寄出必须贴邮票) -->
@@ -100,6 +113,7 @@ const form = reactive({
   content: '',
   stampId: null,
   envelopeId: null,
+  isPublic: 0,
   action: 'send'
 })
 
@@ -111,6 +125,14 @@ const stampDialog = ref(false)
 const selectedStamp = computed(() => myStamps.value.find(s => s.stampId === form.stampId))
 // 可用邮票(可用数量>0，已用完的模板不再出现)
 const availableStamps = computed(() => myStamps.value.filter(s => (s.available || 0) > 0))
+// 选中的信纸(作为写信背景)
+const selectedPaper = computed(() => myEnvelopes.value.find(e => e.envelopeId === form.envelopeId))
+const paperStyle = computed(() => {
+  const url = selectedPaper.value?.envelopeImageUrl
+  return url
+    ? { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : {}
+})
 
 const pickStamp = (s) => {
   form.stampId = form.stampId === s.stampId ? null : s.stampId
@@ -170,6 +192,14 @@ onMounted(async () => {
   box-shadow: 0 2px 10px rgba(140, 116, 80, 0.08);
 }
 .paper-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-right: 72px; }
+/* 信纸背景图上覆盖一层半透明纸色，保证文字可读 */
+.paper-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 253, 246, 0.75);
+  pointer-events: none;
+}
+.paper-inner { position: relative; z-index: 1; }
 .receiver-seg { flex-shrink: 0; }
 .random-hint {
   font-family: var(--serif);

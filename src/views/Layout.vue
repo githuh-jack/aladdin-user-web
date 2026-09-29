@@ -31,6 +31,10 @@
             <span v-for="n in navMenus" :key="n.path" class="nav-link"
                   :class="{ on: isActive(n.path) }" @click="go(n.path)">{{ n.title }}</span>
           </nav>
+          <nav v-else class="nav-links">
+            <span class="nav-link" :class="{ on: isActive('/home') }" @click="go('/home')">首页</span>
+            <span class="nav-link" :class="{ on: isActive('/diary') }" @click="go('/diary')">日记广场</span>
+          </nav>
 
           <div class="nav-right">
             <el-popover placement="bottom" :width="176" trigger="click">
@@ -112,7 +116,6 @@ const adminMenus = [
   { path: '/admin/notes', title: '话题' },
   { path: '/admin/avatars', title: '头像审核' },
   { path: '/admin/login-logs', title: '登录日志' },
-  { path: '/admin/bamboo', title: '文竹生长' },
   { path: '/admin/config', title: '系统配置' },
   { path: '/admin/stamps', title: '邮票' },
   { path: '/admin/envelopes', title: '信封' },

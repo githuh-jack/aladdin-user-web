@@ -11,26 +11,16 @@
       </div>
     </div>
 
-    <!-- 广场：玩家今天写下的日记 -->
+    <!-- 广场：只展示用户头像方格，点进去看详情 -->
     <div v-if="activeTab === 'public'">
-      <div class="today-hint">今日广场 · 玩家们今天写下的字迹</div>
-      <div v-loading="loading" class="timeline">
-        <div v-for="d in list" :key="d.id" class="day-card">
-          <div class="date-bubble">
-            <div class="date-md">{{ fmtMD(d.writeDate) }}</div>
-            <div class="date-week">{{ fmtWeek(d.writeDate) }}</div>
-          </div>
-          <div class="day-body paper-card" @click="viewDetail(d)">
-            <div class="day-head">
-              <span class="day-emoji">{{ moodEmoji(d.mood) }}</span>
-              <span class="day-weather">{{ weatherEmoji(d.weather) }} {{ d.weather || '' }}</span>
-              <span v-if="d.isPublic === 1" class="day-public">公开</span>
-            </div>
-            <div class="day-title">{{ d.title || '(无标题)' }}</div>
-            <div class="day-preview">{{ (d.content || '').slice(0, 70) }}</div>
-          </div>
+      <div class="today-hint">日记广场 · 最近在这里写日记的旅人</div>
+      <div v-loading="loading" class="writer-grid">
+        <div v-for="u in squareUsers" :key="u.userId" class="writer" @click="viewWriter(u)">
+          <img v-if="u.avatar" class="writer-avatar" :src="u.avatar" alt="头像" />
+          <span v-else class="writer-avatar writer-avatar-fallback">{{ (u.name || '客').slice(0, 1) }}</span>
+          <span class="writer-name">{{ u.name || '匿名旅人' }}</span>
         </div>
-        <div v-if="!loading && !list.length" class="empty-poem">今天还没有玩家写日记，广场静悄悄。</div>
+        <div v-if="!loading && !squareUsers.length" class="empty-poem">还没有玩家公开日记，广场静悄悄。</div>
       </div>
     </div>
 
@@ -71,7 +61,6 @@
                   <el-icon @click.stop="remove(d.id)"><Delete /></el-icon>
                 </span>
               </div>
-              <div class="day-title">{{ d.title || '(无标题)' }}</div>
               <div class="day-preview">{{ (d.content || '').slice(0, 70) }}</div>
             </div>
           </div>
@@ -82,18 +71,35 @@
       </div>
     </div>
 
-    <!-- 查看详情 -->
+    <!-- 我的日记查看详情(无标题) -->
     <el-dialog v-model="detailVisible" width="92%" style="max-width: 560px" :show-close="true">
       <template #header>
         <div class="detail-head">
           <span class="detail-emoji">{{ moodEmoji(detailRow.mood) }}</span>
           <div>
-            <div class="detail-title">{{ detailRow.title || '(无标题)' }}</div>
             <div class="detail-meta">{{ detailRow.userName }} · {{ detailRow.writeDate }} · {{ detailRow.mood }} {{ weatherEmoji(detailRow.weather) }}</div>
           </div>
         </div>
       </template>
       <div class="detail-content">{{ detailRow.content }}</div>
+    </el-dialog>
+
+    <!-- 广场：点开旅人头像查看其公开日记详情 -->
+    <el-dialog v-model="writerVisible" width="92%" style="max-width: 560px">
+      <template #header>
+        <div class="detail-head">
+          <img v-if="writerRow.avatar" class="writer-avatar" :src="writerRow.avatar" alt="头像" />
+          <span v-else class="writer-avatar writer-avatar-fallback">{{ (writerRow.name || '客').slice(0, 1) }}</span>
+          <span class="detail-meta">{{ writerRow.name || '匿名旅人' }} 的公开日记</span>
+        </div>
+      </template>
+      <div class="writer-diaries">
+        <div v-for="d in writerDiaries" :key="d.id" class="writer-diary">
+          <div class="writer-diary-meta">{{ d.writeDate }} · {{ moodEmoji(d.mood) }} {{ weatherEmoji(d.weather) }} {{ d.weather || '' }}</div>
+          <div class="detail-content">{{ d.content }}</div>
+        </div>
+        <div v-if="!writerDiaries.length" class="empty-poem">暂时没有公开的日记。</div>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -115,6 +121,11 @@ const list = ref([])
 const loading = ref(false)
 const detailVisible = ref(false)
 const detailRow = ref({})
+// 广场：旅人头像方格
+const writerVisible = ref(false)
+const writerRow = ref({})
+const writerDiaries = computed(() =>
+  list.value.filter(d => String(d.userId) === String(writerRow.value.userId)))
 
 const moods = [
   { emoji: '😊', text: '开心' }, { emoji: '😌', text: '平静' }, { emoji: '🥀', text: '低落' },
@@ -194,6 +205,22 @@ const viewDetail = (row) => {
   detailVisible.value = true
 }
 
+// 广场按用户去重(取每人最新一条公开日记)，最多20位旅人
+const squareUsers = computed(() => {
+  const map = new Map()
+  for (const d of list.value) {
+    if (d.userId == null || map.has(d.userId)) continue
+    map.set(d.userId, { userId: d.userId, name: d.userName, avatar: d.userAvatar })
+    if (map.size >= 20) break
+  }
+  return [...map.values()]
+})
+
+const viewWriter = (u) => {
+  writerRow.value = u
+  writerVisible.value = true
+}
+
 watch(activeTab, load)
 onMounted(load)
 </script>
@@ -209,6 +236,51 @@ onMounted(load)
   letter-spacing: 1px;
   margin-bottom: 12px;
 }
+
+/* 广场：用户头像方格 */
+.writer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  min-height: 80px;
+}
+.writer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 64px;
+  cursor: pointer;
+}
+.writer:active { transform: scale(0.95); }
+.writer-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--soft-border);
+}
+.writer-avatar-fallback {
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 20px;
+}
+.writer-name {
+  font-size: 11px;
+  color: var(--ink-soft);
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.writer-diaries { display: flex; flex-direction: column; gap: 14px; }
+.writer-diary { border-bottom: 1px dashed var(--line); padding-bottom: 12px; }
+.writer-diary:last-child { border-bottom: none; padding-bottom: 0; }
+.writer-diary-meta { font-size: 11px; color: var(--ink-faint); margin-bottom: 6px; }
 .view-row { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 
 .timeline { display: flex; flex-direction: column; gap: 12px; }
@@ -241,7 +313,6 @@ onMounted(load)
 }
 .day-actions { margin-left: auto; display: flex; gap: 10px; color: var(--ink-faint); }
 .day-actions .el-icon:hover { color: var(--accent); }
-.day-title { font-family: var(--serif); font-weight: 600; font-size: 15px; margin-top: 8px; }
 .day-preview {
   color: var(--ink-soft);
   font-size: 13px;
@@ -290,9 +361,9 @@ onMounted(load)
 .dlg-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; font-size: 13px; color: var(--ink-soft); }
 
 .detail-head { display: flex; align-items: center; gap: 10px; }
+.detail-head .writer-avatar { width: 40px; height: 40px; }
 .detail-emoji { font-size: 26px; }
-.detail-title { font-family: var(--serif); font-weight: 700; font-size: 16px; }
-.detail-meta { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+.detail-meta { font-size: 12px; color: var(--ink-faint); }
 .detail-content {
   font-family: var(--serif);
   font-size: 15px;

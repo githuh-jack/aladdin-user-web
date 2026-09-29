@@ -20,7 +20,7 @@
           <img v-if="detail.imageUrl" :src="detail.imageUrl" class="detail-img" alt="" />
           <div v-else :class="detailType === 'stamp' ? 'goods-stamp big' : 'goods-envelope big'">
             <span v-if="detailType === 'stamp'" class="goods-stamp-inner">{{ detail.name?.slice(0, 2) || '邮' }}</span>
-            <span v-else>✉</span>
+            <span v-else>📜</span>
           </div>
         </div>
         <!-- 右：介绍 -->
@@ -66,7 +66,7 @@
     <div v-else v-loading="loading">
       <div class="seg" style="margin-bottom: 14px">
         <button class="seg-item" :class="{ on: activeTab === 'stampShop' }" @click="switchTab('stampShop')">邮票商店</button>
-        <button class="seg-item" :class="{ on: activeTab === 'envelopeShop' }" @click="switchTab('envelopeShop')">信封商店</button>
+        <button class="seg-item" :class="{ on: activeTab === 'envelopeShop' }" @click="switchTab('envelopeShop')">信纸商店</button>
       </div>
 
       <!-- 邮票商店 -->
@@ -94,10 +94,10 @@
         </div>
       </div>
 
-      <!-- 信封商店 -->
+      <!-- 信纸商店 -->
       <div v-else-if="activeTab === 'envelopeShop'" class="goods-grid">
         <div v-for="item in envelopeShopList" :key="item.id" class="paper-card goods-card" @click="openDetail('envelope', item)">
-          <div class="goods-envelope"><span>✉</span></div>
+          <div class="goods-envelope"><span>📜</span></div>
           <div class="goods-name">{{ item.name }}</div>
           <div class="goods-desc">{{ item.description || '—' }}</div>
           <div class="goods-tag">{{ item.envelopeType || '普通' }}</div>
@@ -110,7 +110,7 @@
             </span>
           </div>
         </div>
-        <div v-if="!loading && !envelopeShopList.length" class="empty-poem">暂无上架信封。</div>
+        <div v-if="!loading && !envelopeShopList.length" class="empty-poem">暂无上架信纸。</div>
       </div>
     </div>
   </div>
