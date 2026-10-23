@@ -15,9 +15,10 @@
           <button type="button" class="seg-item" :class="{ on: receiverType === 'no' }" @click="receiverType = 'no'">编号</button>
           <button type="button" class="seg-item" :class="{ on: receiverType === 'random' }" @click="receiverType = 'random'">随机</button>
         </div>
-        <el-select v-if="receiverType === 'friend'" v-model="form.receiverId" placeholder="选择一位好友" filterable
-                   size="default" clearable style="flex: 1" :teleported="false">
-          <el-option v-for="f in friends" :key="f.friendId" :label="f.friendName" :value="f.friendId" />
+        <el-select v-if="receiverType === 'friend'" v-model="form.receiverIds" placeholder="选择好友(可多选群发)" filterable
+                   size="default" multiple :multiple-limit="20" collapse-tags collapse-tags-tooltip
+                   clearable style="flex: 1" :teleported="false">
+          <el-option v-for="f in friends" :key="f.friendId" :label="friendLabel(f)" :value="f.friendId" />
         </el-select>
         <el-input v-else-if="receiverType === 'no'" v-model.trim="form.receiverNo"
                   maxlength="6" placeholder="输入对方6位编号" style="flex: 1" clearable />
@@ -43,7 +44,7 @@
           <template v-if="selectedStamp">{{ selectedStamp.stampName }}</template>
           <template v-else>贴邮票 +</template>
         </div>
-        <div v-if="selectedStamp" class="stamp-days">约{{ selectedStamp.deliveryDays || 3 }}天达</div>
+        <div v-if="selectedStamp" class="stamp-days">{{ stampDaysText }}</div>
       </div>
       </div>
     </div>
@@ -107,7 +108,7 @@ const myStamps = ref([])
 const myEnvelopes = ref([])
 
 const form = reactive({
-  receiverId: null,
+  receiverIds: [],
   receiverNo: '',
   title: '',
   content: '',
@@ -115,6 +116,15 @@ const form = reactive({
   envelopeId: null,
   isPublic: 0,
   action: 'send'
+})
+
+// 好友下拉显示备注(有备注优先)，无备注显示昵称
+const friendLabel = (f) => (f.remark ? `${f.remark}（${f.friendName}）` : f.friendName)
+// 群发人数(决定消耗邮票数量)
+const multiCount = computed(() => (receiverType.value === 'friend' ? (form.receiverIds || []).length : 0))
+const stampDaysText = computed(() => {
+  const d = selectedStamp.value?.deliveryDays || 3
+  return multiCount.value > 1 ? `约${d}天达 · 需${multiCount.value}枚邮票` : `约${d}天达`
 })
 
 // 收件方式: friend=好友 no=唯一编号 random=随机
@@ -143,8 +153,8 @@ const toggleEnvelope = (e) => {
 
 const send = async (action) => {
   // 随机模式无需选择收件人；草稿也不要求
-  if (action === 'send' && receiverType.value === 'friend' && !form.receiverId) {
-    ElMessage.warning('请选择收件人')
+  if (action === 'send' && receiverType.value === 'friend' && !(form.receiverIds || []).length) {
+    ElMessage.warning('请选择收件人(可多选)')
     return
   }
   if (action === 'send' && receiverType.value === 'no' && !form.receiverNo) {
@@ -157,16 +167,26 @@ const send = async (action) => {
     stampDialog.value = true
     return
   }
-  const payload = { ...form }
+  // 群发按人数消耗邮票：校验该邮票可用数量是否足够
+  if (action === 'send' && multiCount.value > 1 && selectedStamp.value
+      && (selectedStamp.value.available || 0) < multiCount.value) {
+    ElMessage.warning(`「${selectedStamp.value.stampName}」余 ${selectedStamp.value.available} 枚，不足群发所需的 ${multiCount.value} 枚`)
+    stampDialog.value = true
+    return
+  }
+  const payload = { ...form, receiverId: null }
+  if (receiverType.value === 'friend') {
+    // 多选好友群发：后端按人数逐封寄出并扣减邮票
+    payload.receiverIds = form.receiverIds
+  }
   if (receiverType.value === 'no') {
     // 按唯一编号寄信
     payload.receiverNo = form.receiverNo
-    payload.receiverId = null
   }
   if (receiverType.value === 'random') {
-    payload.receiverId = null
     payload.random = true
   }
+  delete payload.receiverId
   form.action = action
   await letterApi.write(payload)
   ElMessage.success(action === 'send' ? '纸船已出发 ⛵' : '已存为草稿')
@@ -177,7 +197,7 @@ onMounted(async () => {
   try { const r = await friendApi.list(); friends.value = r.data || [] } catch {}
   try { const r = await stampApi.mine(); myStamps.value = r.data || [] } catch {}
   try { const r = await envelopeApi.mine(); myEnvelopes.value = (r.data || []).filter(e => (e.available || 0) > 0) } catch {}
-  if (route.query.receiverId) form.receiverId = Number(route.query.receiverId)
+  if (route.query.receiverId) form.receiverIds = [Number(route.query.receiverId)]
 })
 </script>
 

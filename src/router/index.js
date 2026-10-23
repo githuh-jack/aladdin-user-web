@@ -27,6 +27,7 @@ const routes = [
       { path: 'diary/write', name: 'DiaryWrite', component: () => import('@/views/DiaryWrite.vue') },
       { path: 'notes', name: 'Notes', component: () => import('@/views/Notes.vue'), meta: { guest: true } },
       { path: 'shop', name: 'Shop', component: () => import('@/views/Shop.vue') },
+      { path: 'feedback', name: 'Feedback', component: () => import('@/views/Feedback.vue') },
       { path: 'profile', name: 'Profile', component: () => import('@/views/Profile.vue') },
       { path: 'admin/letters', name: 'AdminLetters', component: () => import('@/views/admin/Letters.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/announcements', name: 'AdminAnnouncements', component: () => import('@/views/admin/Announcements.vue'), meta: { requiresAdmin: true } },
@@ -40,6 +41,7 @@ const routes = [
       { path: 'admin/stamps', name: 'AdminStamps', component: () => import('@/views/admin/Stamps.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/envelopes', name: 'AdminEnvelopes', component: () => import('@/views/admin/Envelopes.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/coin', name: 'AdminCoin', component: () => import('@/views/admin/Coin.vue'), meta: { requiresAdmin: true } },
+      { path: 'admin/feedback', name: 'AdminFeedback', component: () => import('@/views/admin/Feedback.vue'), meta: { requiresAdmin: true } },
       { path: 'admin/orders', name: 'AdminOrders', component: () => import('@/views/admin/Orders.vue'), meta: { requiresAdmin: true } }
     ]
   },

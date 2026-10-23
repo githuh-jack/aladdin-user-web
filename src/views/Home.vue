@@ -40,9 +40,9 @@
         <span class="sq-title">⛵ 信件广场</span>
       </div>
 
-      <!-- 最近写信的旅人(仅头像与昵称) -->
+      <!-- 最近写信的旅人(仅头像与昵称，点击查看TA的公开信件) -->
       <div v-if="writers.length" class="writer-grid">
-        <div v-for="w in writers" :key="w.userId || w.user_id" class="writer">
+        <div v-for="w in writers" :key="w.userId || w.user_id" class="writer" @click="viewWriter(w)">
           <img v-if="w.avatarUrl || w.avatar_url" class="writer-avatar" :src="w.avatarUrl || w.avatar_url" alt="头像" />
           <span v-else class="writer-avatar writer-avatar-fallback">{{ (w.senderName || w.sender_name || '客').slice(0, 1) }}</span>
           <span class="writer-name">{{ w.senderName || w.sender_name || '匿名旅人' }}</span>
@@ -79,6 +79,26 @@
       </template>
     </el-dialog>
 
+    <!-- 旅人信笺(点击广场头像查看TA的公开信件) -->
+    <el-dialog v-model="writerDialog" width="92%" style="max-width: 560px">
+      <template #header>
+        <div class="pub-detail-head">
+          <span class="pub-detail-name">{{ currentWriterName }} 的信笺</span>
+        </div>
+      </template>
+      <div v-if="writerLetters.length" class="writer-letters">
+        <div v-for="l in writerLetters" :key="l.id" class="writer-letter paper-card" @click="viewLetter(l)">
+          <div class="pub-title" v-if="l.title">{{ l.title }}</div>
+          <div class="writer-letter-content">{{ l.content }}</div>
+          <div class="pub-time">{{ l.sendTime || '' }}</div>
+        </div>
+      </div>
+      <div v-else class="sq-empty">TA还没有公开的信笺漂到这里</div>
+      <template #footer>
+        <el-button round @click="writerDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 公告弹窗(登录后可见，可勾选不再提示) -->
     <el-dialog v-model="showNotice" title="📣 船长公告" width="92%" style="max-width: 560px">
       <div v-for="n in notices" :key="n.id" class="notice-item">
@@ -111,6 +131,10 @@ const loading = ref(false)
 // 公开信件详情
 const letterDialog = ref(false)
 const currentLetter = ref(null)
+// 旅人信笺(点击广场头像)
+const writerDialog = ref(false)
+const currentWriterName = ref('')
+const writerLetters = ref([])
 // 公告(登录后弹窗)
 const showNotice = ref(false)
 const notices = ref([])
@@ -132,6 +156,16 @@ const greeting = computed(() => {
 const viewLetter = (l) => {
   currentLetter.value = l
   letterDialog.value = true
+}
+
+// 点击旅人头像：展示TA的公开信件(从广场公开信件中按寄件人筛选)
+const viewWriter = (w) => {
+  const wid = String(w.userId ?? w.user_id ?? '')
+  currentWriterName.value = w.senderName || w.sender_name || '匿名旅人'
+  writerLetters.value = wid
+    ? publicLetters.value.filter(l => String(l.senderId ?? l.sender_id ?? '') === wid)
+    : []
+  writerDialog.value = true
 }
 
 // 勾选"不再提示"后，记住最新公告id；有新公告仍会弹出
@@ -245,7 +279,11 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   width: 64px;
+  cursor: pointer;
+  transition: transform .1s;
 }
+.writer:hover .writer-avatar { border-color: var(--accent); }
+.writer:active { transform: scale(0.95); }
 .writer-avatar {
   width: 52px;
   height: 52px;
@@ -334,6 +372,24 @@ onMounted(async () => {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--ink);
+}
+
+/* 旅人信笺弹窗 */
+.writer-letters { display: flex; flex-direction: column; gap: 12px; }
+.writer-letter { padding: 12px 14px; cursor: pointer; transition: transform .1s; }
+.writer-letter:active { transform: scale(0.99); }
+.writer-letter-content {
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.8;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* 公告弹窗 */

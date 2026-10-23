@@ -15,11 +15,15 @@
       <!-- 好友列表 -->
       <template v-if="activeTab === 'list'">
         <div v-for="f in list" :key="f.id" class="paper-card friend-card">
-          <div class="friend-avatar">{{ (f.friendName || '友').slice(0, 1) }}</div>
+          <div class="friend-avatar">{{ ((f.remark) || f.friendName || '友').slice(0, 1) }}</div>
           <div class="friend-info">
-            <div class="friend-name">{{ f.friendName }}</div>
+            <div class="friend-name">
+              <span v-if="f.remark" class="friend-remark">{{ f.remark }}</span>
+              <span class="friend-nickname">{{ f.friendName }}</span>
+            </div>
             <div class="friend-since">{{ f.addTime ? `成为笔友于 ${f.addTime}` : '' }}</div>
           </div>
+          <el-icon class="friend-del" title="设置备注" @click="openRemark(f)"><EditPen /></el-icon>
           <el-button round size="small" type="primary" plain @click="writeLetter(f)">写信</el-button>
           <el-icon class="friend-del" title="拉黑" @click="black(f)"><Hide /></el-icon>
           <el-icon class="friend-del" @click="remove(f.id)"><Delete /></el-icon>
@@ -70,6 +74,15 @@
         <el-button round type="primary" @click="doApply">发送申请</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="remarkDialog" title="设置备注" width="88%" style="max-width: 420px">
+      <el-input v-model="remarkForm.remark" :placeholder="`给 ${remarkForm.name} 起个只有自己可见的备注`"
+                maxlength="50" show-word-limit clearable />
+      <template #footer>
+        <el-button round @click="remarkDialog = false">取消</el-button>
+        <el-button round type="primary" :loading="remarkSaving" @click="saveRemark">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -77,7 +90,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Hide } from '@element-plus/icons-vue'
+import { Delete, Hide, EditPen } from '@element-plus/icons-vue'
 import { friendApi } from '@/api'
 
 const router = useRouter()
@@ -152,6 +165,26 @@ const writeLetter = (friend) => {
   router.push({ path: '/letters/write', query: { receiverId: friend.friendId } })
 }
 
+// 好友备注(仅自己可见)
+const remarkDialog = ref(false)
+const remarkSaving = ref(false)
+const remarkForm = reactive({ id: null, name: '', remark: '' })
+const openRemark = (f) => {
+  remarkForm.id = f.id
+  remarkForm.name = f.friendName
+  remarkForm.remark = f.remark || ''
+  remarkDialog.value = true
+}
+const saveRemark = async () => {
+  remarkSaving.value = true
+  try {
+    await friendApi.remark(remarkForm.id, remarkForm.remark.trim())
+    ElMessage.success('备注已保存')
+    remarkDialog.value = false
+    load()
+  } finally { remarkSaving.value = false }
+}
+
 onMounted(load)
 </script>
 
@@ -173,7 +206,9 @@ onMounted(load)
   flex-shrink: 0;
 }
 .friend-info { flex: 1; min-width: 0; }
-.friend-name { font-family: var(--serif); font-weight: 600; font-size: 15px; }
+.friend-name { font-family: var(--serif); font-weight: 600; font-size: 15px; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.friend-remark { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-nickname { font-size: 12px; font-weight: normal; color: var(--ink-faint); flex-shrink: 0; }
 .friend-since { font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
 .friend-since.faint { color: var(--ink-faint); opacity: 0.8; }
 .apply-actions { display: flex; gap: 6px; flex-shrink: 0; }

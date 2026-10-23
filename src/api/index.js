@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import router from '@/router'
 
 const request = axios.create({
   baseURL: '/',
@@ -15,15 +16,28 @@ request.interceptors.request.use(config => {
   return config
 })
 
+// 登录态失效：清掉本地登录态；游客可看的页面(首页/日记/话题)原地转为游客继续浏览，其余才跳登录页
+const handleUnauthorized = () => {
+  const userStore = useUserStore()
+  if (!userStore.token) return
+  userStore.logout()
+  const route = router.currentRoute.value
+  const guestAllowed = !!(route.meta && (route.meta.public || route.meta.guest))
+  if (!guestAllowed) {
+    window.location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search)
+  } else {
+    ElMessage.warning('登录已过期，已为你切换为游客浏览')
+  }
+}
+
 request.interceptors.response.use(
   response => {
     const res = response.data
     if (res.code !== undefined && res.code !== 0 && res.code !== 200) {
-      ElMessage.error(res.msg || res.message || '请求失败')
       if (res.code === 401 || res.code === 20001 || res.code === 20002 || res.code === 20003 || res.code === 20005) {
-        const userStore = useUserStore()
-        userStore.logout()
-        window.location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search)
+        handleUnauthorized()
+      } else {
+        ElMessage.error(res.msg || res.message || '请求失败')
       }
       return Promise.reject(new Error(res.msg || 'Error'))
     }
@@ -31,9 +45,8 @@ request.interceptors.response.use(
   },
   error => {
     if (error.response && error.response.status === 401) {
-      const userStore = useUserStore()
-      userStore.logout()
-      window.location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search)
+      handleUnauthorized()
+      return Promise.reject(error)
     }
     ElMessage.error(error.response?.data?.msg || error.message || '网络错误')
     return Promise.reject(error)
@@ -73,8 +86,15 @@ export const letterApi = {
   sent: (params) => request.get('/biz/letter/sent', { params }),
   inbox: (params) => request.get('/biz/letter/inbox', { params }),
   detail: (id) => request.get(`/biz/letter/detail/${id}`),
+  history: (friendId) => request.get(`/biz/letter/history/${friendId}`),
   refuse: (id) => request.post(`/biz/letter/refuse/${id}`),
   remove: (id) => request.post(`/biz/letter/remove/${id}`)
+}
+
+// 举报
+export const reportApi = {
+  reportLetter: (data) => request.post('/biz/report/letter', data),
+  mine: () => request.get('/biz/report/mine')
 }
 
 // 好友
@@ -83,6 +103,7 @@ export const friendApi = {
   applies: () => request.get('/biz/friend/applies'),
   apply: (data) => request.post('/biz/friend/apply', data),
   handle: (id, data) => request.post(`/biz/friend/handle/${id}`, data),
+  remark: (id, remark) => request.post(`/biz/friend/remark/${id}`, { remark }),
   remove: (id) => request.post(`/biz/friend/remove/${id}`),
   blacklist: (targetId) => request.post(`/biz/friend/blacklist/${targetId}`),
   unblacklist: (targetId) => request.post(`/biz/friend/unblacklist/${targetId}`),
@@ -163,6 +184,17 @@ export const sysMailApi = {
   claim: (id) => request.post(`/biz/mail/claim/${id}`)
 }
 
+// 勋章
+export const medalApi = {
+  my: () => request.get('/biz/medal/my')
+}
+
+// 问题反馈
+export const feedbackApi = {
+  submit: (data) => request.post('/biz/feedback/submit', data),
+  mine: () => request.get('/biz/feedback/mine')
+}
+
 // 业务管理(仅admin)
 export const adminApi = {
   announcements: () => request.get('/biz/announcement/admin/list'),
@@ -189,6 +221,8 @@ export const adminApi = {
   coinOrders: (params) => request.get('/biz/coin/admin/orders', { params }),
   coinAdjust: (data) => request.post('/biz/coin/admin/adjust', data),
   loginLogs: (params) => request.get('/biz/log/admin/login', { params }),
+  feedbacks: (params) => request.get('/biz/feedback/admin/list', { params }),
+  feedbackHandle: (id, data) => request.post(`/biz/feedback/admin/handle/${id}`, data),
   configList: () => request.get('/biz/config/admin/list'),
   configSave: (data) => request.post('/biz/config/admin/save', data)
 }

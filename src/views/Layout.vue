@@ -120,6 +120,7 @@ const adminMenus = [
   { path: '/admin/stamps', title: '邮票' },
   { path: '/admin/envelopes', title: '信封' },
   { path: '/admin/coin', title: '铜钱' },
+  { path: '/admin/feedback', title: '反馈' },
   { path: '/admin/orders', title: '订单' }
 ]
 
@@ -139,7 +140,9 @@ const onCommand = (cmd) => {
   if (cmd === 'profile') router.push('/profile')
   else if (cmd === 'logout') {
     userStore.logout()
-    router.push('/login')
+    // 退出后游客可看的页面(首页/日记/话题)原地停留为游客，其余回首页
+    const guestAllowed = !!(route.meta && (route.meta.public || route.meta.guest))
+    if (!guestAllowed) router.push('/home')
   }
 }
 

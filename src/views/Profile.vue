@@ -6,7 +6,7 @@
         <img v-if="userStore.avatar" class="avatar-img" :src="userStore.avatar" alt="头像" />
         <div v-else class="avatar-circle">{{ avatarChar }}</div>
         <div class="name">{{ userStore.realName || userStore.username || '旅人' }}</div>
-        <div class="sub">编号 · {{ userNo || '—' }} <span style="margin-left: 8px">ID · {{ userStore.userId || '—' }}</span></div>
+        <div class="sub">编号 · {{ userNo || '—' }}</div>
         <div class="sig">{{ profile.signature || '还没有个性签名，点击下方编辑' }}</div>
         <div class="info-chips">
           <span class="role-chip">邀请码 · {{ profile.inviteCode || '—' }}</span>
@@ -21,7 +21,18 @@
           <span v-for="r in (userStore.roles || [])" :key="r" class="role-chip">{{ r }}</span>
           <span v-if="!userStore.roles || !userStore.roles.length" class="role-chip">普通用户</span>
         </div>
-        <el-button round size="small" style="margin-top: 12px" @click="openEdit">编辑资料</el-button>
+        <!-- 勋章墙入口：点亮已获得的勋章，点击查看全部 -->
+        <div class="medal-strip" @click="openMedals">
+          <template v-if="earnedMedals.length">
+            <span v-for="m in earnedMedals.slice(0, 5)" :key="m.medalId" class="medal-mini earned" :title="m.name">{{ medalIcon(m) }}</span>
+            <span class="medal-more">{{ earnedMedals.length }}/{{ medals.length }} 枚</span>
+          </template>
+          <span v-else class="medal-empty-tip">还没有点亮勋章，点击查看勋章墙</span>
+        </div>
+        <div class="btn-row">
+          <el-button round size="small" @click="openEdit">编辑资料</el-button>
+          <el-button round size="small" @click="feedbackVisible = true">问题反馈</el-button>
+        </div>
       </div>
 
       <div class="coin-card paper-card">
@@ -179,6 +190,27 @@
       <Friends />
     </el-dialog>
 
+    <!-- 勋章墙 -->
+    <el-dialog v-model="medalVisible" title="勋章墙" width="92%" style="max-width: 560px">
+      <div v-if="medals.length" class="medal-grid">
+        <div v-for="m in medals" :key="m.medalId" class="medal-item" :class="{ earned: m.earned }">
+          <div class="medal-icon">{{ medalIcon(m) }}</div>
+          <div class="medal-name">{{ m.name }}</div>
+          <div class="medal-desc">{{ m.description || '——' }}</div>
+          <div class="medal-state">
+            <span v-if="m.earned">{{ (m.earnedTime || '').slice(0, 10) }} 获得</span>
+            <span v-else>未获得</span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-poem">暂无奖章定义</div>
+    </el-dialog>
+
+    <!-- 问题反馈 -->
+    <el-dialog v-model="feedbackVisible" width="94%" style="max-width: 900px" destroy-on-close>
+      <Feedback />
+    </el-dialog>
+
     <!-- 邮票收藏进度 -->
     <el-dialog v-model="collectionVisible" title="邮票收藏进度" width="92%" style="max-width: 480px">
       <template v-if="collectionList.length">
@@ -256,8 +288,9 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi, authApi, redeemApi } from '@/api'
+import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi, authApi, redeemApi, medalApi } from '@/api'
 import Friends from './Friends.vue'
+import Feedback from './Feedback.vue'
 
 const userStore = useUserStore()
 const avatarChar = computed(() => (userStore.realName || userStore.username || '客').slice(0, 1))
@@ -461,6 +494,23 @@ const saveProfile = async () => {
   } finally { savingProfile.value = false }
 }
 
+// 勋章墙(全部定义+是否点亮)
+const medalVisible = ref(false)
+const medals = ref([])
+const earnedMedals = computed(() => medals.value.filter(m => m.earned))
+// 勋章图标：定义未配 icon 时按名称兜底
+const medalIcon = (m) => m.icon || '🎖'
+const loadMedals = async () => {
+  try {
+    const r = await medalApi.my()
+    medals.value = r.data || []
+  } catch (e) { /* ignore */ }
+}
+const openMedals = () => { medalVisible.value = true }
+
+// 问题反馈(弹窗内嵌 Feedback 页面)
+const feedbackVisible = ref(false)
+
 // 好友管理(点击"好友"卡片查看)
 const friendsVisible = ref(false)
 const friendCount = ref(0)
@@ -508,6 +558,7 @@ const loadAll = async () => {
     loadFriendCount()
     loadProfile()
     loadInvite()
+    loadMedals()
     // 唯一编号 + 小星星累计
     try {
       const r = await authApi.userInfo()
@@ -634,6 +685,57 @@ onMounted(loadAll)
   border-radius: 999px;
   padding: 2px 10px;
 }
+
+/* 勋章墙 */
+.medal-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+.medal-mini {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  border: 1px solid var(--soft-border);
+  background: var(--paper-warm);
+  transition: transform .1s;
+}
+.medal-strip:hover .medal-mini.earned { transform: translateY(-2px); }
+.medal-mini.earned {
+  background: linear-gradient(135deg, #fdf1d7, #f3dfae);
+  border-color: #e0c486;
+}
+.medal-more { font-size: 11px; color: var(--gold); font-family: var(--serif); }
+.medal-empty-tip { font-size: 11px; color: var(--ink-faint); font-family: var(--serif); }
+.medal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.medal-item {
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 10px;
+  background: var(--paper-bg);
+  opacity: .5;
+}
+.medal-item.earned {
+  opacity: 1;
+  background: linear-gradient(160deg, #fffdf4, #fbf3e3);
+  border-color: #e0c486;
+}
+.medal-icon { font-size: 26px; }
+.medal-name { font-family: var(--serif); font-weight: 700; font-size: 14px; margin-top: 6px; color: var(--ink); }
+.medal-desc { font-size: 11px; color: var(--ink-faint); margin-top: 4px; line-height: 1.6; min-height: 18px; }
+.medal-state { font-size: 11px; color: var(--gold); margin-top: 6px; }
+.medal-item:not(.earned) .medal-state { color: var(--ink-faint); }
+
+.btn-row { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
 
 .coin-card {
   text-align: center;

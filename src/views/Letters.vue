@@ -54,6 +54,9 @@
             </div>
           </div>
           <span v-if="canRefuse(item)" class="env-refuse" @click.stop="refuse(item)">拒收</span>
+          <span v-if="canAct(item)" class="env-act" @click.stop="openReport(item)">举报</span>
+          <span v-if="canAct(item) && !isFriend(item)" class="env-act" @click.stop="addFriend(item)">{{ appliedSet.has(String(item.senderId)) ? '已申请' : '加好友' }}</span>
+          <span v-if="isFriend(item)" class="env-act" @click.stop="openHistory(item)">来往</span>
           <el-icon v-if="!item.isSys" class="env-del" @click.stop="remove(item.id)"><Delete /></el-icon>
         </div>
       </div>
@@ -69,6 +72,40 @@
         <el-button v-if="currentMail && !currentMail.claimed" round type="primary" @click="claimMail">领取附赠</el-button>
       </template>
     </el-dialog>
+
+    <!-- 举报信件 -->
+    <el-dialog v-model="reportDialog" title="举报这封信" width="92%" style="max-width: 460px">
+      <div class="report-cats">
+        <span v-for="c in REPORT_CATS" :key="c" class="chip" :class="{ on: reportForm.category === c }"
+              @click="reportForm.category = c">{{ c }}</span>
+      </div>
+      <el-input v-model="reportForm.description" type="textarea" :rows="4" maxlength="200" show-word-limit
+                placeholder="补充说明(选填，选择「其他」时必填)" style="margin-top: 12px" />
+      <template #footer>
+        <el-button round @click="reportDialog = false">取消</el-button>
+        <el-button round type="primary" :loading="reporting" @click="submitReport">提交举报</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 来往信封(与好友的全部往来信件) -->
+    <el-dialog v-model="historyDialog" :title="historyFriendName + ' 的来往信封'" width="94%" style="max-width: 620px">
+      <div v-loading="historyLoading">
+        <div v-if="historyList.length" class="history-list">
+          <div v-for="h in historyList" :key="h.id" class="history-item paper-card" @click="router.push(`/letters/${h.id}`)">
+            <div class="history-head">
+              <span class="history-dir" :class="{ mine: Number(h.boxRecv) !== 1 }">{{ Number(h.boxRecv) === 1 ? '收' : '寄' }}</span>
+              <span class="history-title">{{ h.title || '(无标题)' }}</span>
+              <span class="history-time">{{ h.sendTime }}</span>
+            </div>
+            <div class="history-preview">{{ h.content }}</div>
+          </div>
+        </div>
+        <div v-else class="empty-poem" style="padding: 30px 0">还没有来往信件，写一封吧。</div>
+      </div>
+      <template #footer>
+        <el-button round @click="historyDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
     <div v-if="!loading && !list.length" class="empty-poem">
       {{ emptyText }}
     </div>
@@ -76,11 +113,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
-import { letterApi, sysMailApi } from '@/api'
+import { letterApi, sysMailApi, friendApi, reportApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -152,6 +189,16 @@ const load = async () => {
       } catch {}
     }
     list.value = items
+    // 好友集合：用于"加好友/来往"按钮状态
+    try {
+      const fr = await friendApi.list()
+      friendIds.value = new Set((fr.data || []).map(f => String(f.friendId ?? f.userId)))
+      // 已申请未通过集合
+      const ar = await friendApi.applies()
+      appliedSet.value = new Set((ar.data || [])
+        .filter(a => Number(a.status) === 0)
+        .map(a => String(a.targetId ?? a.toUserId ?? a.friendId)))
+    } catch {}
   } finally { loading.value = false }
 }
 
@@ -191,6 +238,67 @@ const refuse = async (item) => {
   await letterApi.refuse(item.id)
   ElMessage.success('已拒收，信件正在退回寄件人')
   load()
+}
+
+// ===== 举报 / 加好友 / 来往信封 =====
+const REPORT_CATS = ['辱骂攻击', '色情低俗', '广告骚扰', '政治敏感', '违法信息', '其他']
+const friendIds = ref(new Set())
+const appliedSet = ref(new Set())
+const isFriend = (item) => friendIds.value.has(String(item.senderId))
+
+const canAct = (item) => !item.isSys && Number(item.boxRecv) === 1
+
+const openReport = (item) => {
+  reportForm.targetId = item.id
+  reportForm.category = ''
+  reportForm.description = ''
+  reportDialog.value = true
+}
+const reportDialog = ref(false)
+const reporting = ref(false)
+const reportForm = reactive({ targetId: null, category: '', description: '' })
+const submitReport = async () => {
+  if (!reportForm.category) return ElMessage.warning('请选择举报类型')
+  if (reportForm.category === '其他' && !reportForm.description.trim()) {
+    return ElMessage.warning('选择「其他」时请补充说明')
+  }
+  reporting.value = true
+  try {
+    await reportApi.reportLetter({
+      letterId: reportForm.targetId,
+      category: reportForm.category,
+      description: reportForm.description.trim()
+    })
+    ElMessage.success('举报已提交，感谢你的反馈')
+    reportDialog.value = false
+  } finally { reporting.value = false }
+}
+
+const addFriend = async (item) => {
+  const uid = item.senderId
+  if (!uid) return
+  await ElMessageBox.confirm(
+    `向「${item.senderName || '这位旅人'}」发送好友申请？通过后可以查看来往信封。`,
+    '添加好友',
+    { type: 'info', confirmButtonText: '发送申请', cancelButtonText: '取消' }
+  )
+  await friendApi.apply({ targetId: uid, applyRemark: '' })
+  ElMessage.success('好友申请已寄出')
+  appliedSet.value = new Set([...appliedSet.value, String(uid)])
+}
+
+const historyDialog = ref(false)
+const historyLoading = ref(false)
+const historyList = ref([])
+const historyFriendName = ref('')
+const openHistory = async (item) => {
+  historyFriendName.value = item.senderName || '这位好友'
+  historyDialog.value = true
+  historyLoading.value = true
+  try {
+    const r = await letterApi.history(item.senderId)
+    historyList.value = r.data || []
+  } finally { historyLoading.value = false }
 }
 
 const switchTab = (t) => {
@@ -303,6 +411,69 @@ onMounted(load)
   flex-shrink: 0;
 }
 .env-refuse:hover { color: #a34f2c; text-decoration: underline; }
+.env-act {
+  font-size: 12px;
+  color: var(--gold, #a8863c);
+  cursor: pointer;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+.env-act:hover { color: #7a5c1e; text-decoration: underline; }
+
+/* 举报弹窗 */
+.report-cats { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-cats .chip {
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--soft-border, #e5dcc6);
+  cursor: pointer;
+  color: var(--ink-soft, #6b5d4d);
+  background: #fffdf6;
+}
+.report-cats .chip.on {
+  color: #fff;
+  background: var(--accent, #7a5c3e);
+  border-color: var(--accent, #7a5c3e);
+}
+
+/* 来往信封 */
+.history-list { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.history-item { padding: 10px 14px; cursor: pointer; }
+.history-item:active { transform: scale(0.99); }
+.history-head { display: flex; align-items: center; gap: 8px; }
+.history-dir {
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  background: #eef4ec;
+  color: #5a7a52;
+  flex-shrink: 0;
+}
+.history-dir.mine { background: #f3ecdf; color: #8a6f45; }
+.history-title {
+  font-family: var(--serif, serif);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink, #3d3327);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.history-time { font-size: 11px; color: var(--ink-faint, #b0a48c); flex-shrink: 0; }
+.history-preview {
+  font-size: 12px;
+  color: var(--ink-soft, #6b5d4d);
+  margin-top: 6px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .empty-poem {
   text-align: center;
   font-family: var(--serif);
