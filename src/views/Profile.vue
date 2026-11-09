@@ -46,6 +46,23 @@
       </div>
     </div>
 
+    <!-- 每日签到 -->
+    <div v-if="!isGuest" class="checkin-card paper-card">
+      <div class="checkin-left">
+        <span class="checkin-emoji">🗓</span>
+        <div>
+          <div class="checkin-title">
+            每日签到
+            <span v-if="checkin.todayChecked" class="checkin-badge done">今日已签 ✓</span>
+            <span v-else class="checkin-badge todo">未签</span>
+          </div>
+          <div class="checkin-sub">已连续签到 {{ checkin.streakDays }} 天</div>
+        </div>
+      </div>
+      <el-button v-if="!checkin.todayChecked" round type="primary" size="small"
+                 :loading="checkingIn" @click="submitCheckin">立即签到</el-button>
+    </div>
+
     <!-- 统计 -->
     <div class="stat-row">
       <div class="stat-item paper-card" title="管理好友" style="cursor: pointer" @click="openFriends">
@@ -288,15 +305,47 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi, authApi, redeemApi, medalApi } from '@/api'
+import { coinApi, stampApi, envelopeApi, friendApi, profileApi, inviteApi, authApi, redeemApi, medalApi, checkinApi } from '@/api'
 import Friends from './Friends.vue'
 import Feedback from './Feedback.vue'
 
 const userStore = useUserStore()
 const avatarChar = computed(() => (userStore.realName || userStore.username || '客').slice(0, 1))
+const isGuest = computed(() => !userStore.token)
 // 用户唯一编号(邮寄信件凭编号)
 const userNo = ref('')
 const starCount = ref(0)
+
+// 每日签到(仅登录态展示)
+const checkin = reactive({ todayChecked: false, streakDays: 0 })
+const checkingIn = ref(false)
+const loadCheckin = async () => {
+  if (isGuest.value) return
+  try {
+    const r = await checkinApi.status()
+    checkin.todayChecked = !!r.data?.todayChecked
+    checkin.streakDays = r.data?.streakDays || 0
+  } catch (e) { /* ignore */ }
+}
+const submitCheckin = async () => {
+  if (checkingIn.value) return
+  checkingIn.value = true
+  try {
+    const r = await checkinApi.submit()
+    const coins = r.data?.coinsGranted || 0
+    ElMessage.success(`签到成功，获得 ${coins} 铜钱`)
+    checkin.todayChecked = true
+    checkin.streakDays = r.data?.streakDays || checkin.streakDays
+    // 刷新页面铜钱余额
+    try {
+      const b = await coinApi.balance()
+      balance.value = b.data?.balance ?? balance.value
+    } catch {}
+  } catch (e) {
+    // 当日已签(HTTP 400)：把状态刷新为已签
+    await loadCheckin()
+  } finally { checkingIn.value = false }
+}
 
 const loading = ref(false)
 const activeTab = ref('stamps')
@@ -579,7 +628,10 @@ const viewImage = (url, name) => {
   })
 }
 
-onMounted(loadAll)
+onMounted(() => {
+  loadAll()
+  loadCheckin()
+})
 </script>
 
 <style scoped>
@@ -752,6 +804,38 @@ onMounted(loadAll)
 .coin-value { font-family: var(--serif); font-size: 32px; font-weight: 700; color: #7a5b1f; }
 .coin-value small { font-size: 13px; color: #a78748; font-weight: normal; }
 .coin-label { font-size: 11px; color: #8a6f3e; margin: 4px 0 10px; }
+
+/* 每日签到 */
+.checkin-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  margin-bottom: 14px;
+}
+.checkin-left { display: flex; align-items: center; gap: 12px; }
+.checkin-emoji { font-size: 22px; }
+.checkin-title {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.checkin-badge {
+  font-family: initial;
+  font-size: 10px;
+  font-weight: normal;
+  border-radius: 999px;
+  padding: 1px 8px;
+  border: 1px solid var(--soft-border);
+}
+.checkin-badge.done { color: #5a7a52; background: #eef4ec; }
+.checkin-badge.todo { color: var(--gold); background: var(--paper-warm); }
+.checkin-sub { font-size: 11px; color: var(--ink-faint); margin-top: 3px; }
 
 .stat-row { display: flex; gap: 10px; margin-bottom: 16px; }
 .stat-item { flex: 1; text-align: center; padding: 12px 0; cursor: default; }

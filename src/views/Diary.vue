@@ -95,20 +95,37 @@
       </template>
       <div class="writer-diaries">
         <div v-for="d in writerDiaries" :key="d.id" class="writer-diary">
-          <div class="writer-diary-meta">{{ d.writeDate }} · {{ moodEmoji(d.mood) }} {{ weatherEmoji(d.weather) }} {{ d.weather || '' }}</div>
+          <div class="writer-diary-top">
+            <div class="writer-diary-meta">{{ d.writeDate }} · {{ moodEmoji(d.mood) }} {{ weatherEmoji(d.weather) }} {{ d.weather || '' }}</div>
+            <span v-if="canReportDiary(d)" class="diary-report" @click="openDiaryReport(d)">举报</span>
+          </div>
           <div class="detail-content">{{ d.content }}</div>
         </div>
         <div v-if="!writerDiaries.length" class="empty-poem">暂时没有公开的日记。</div>
       </div>
     </el-dialog>
+
+    <!-- 举报日记(仅非作者本人可举报) -->
+    <el-dialog v-model="diaryReportVisible" title="举报这篇日记" width="92%" style="max-width: 460px">
+      <div class="report-cats">
+        <span v-for="c in REPORT_CATS" :key="c" class="chip" :class="{ on: diaryReportForm.category === c }"
+              @click="diaryReportForm.category = c">{{ c }}</span>
+      </div>
+      <el-input v-model="diaryReportForm.description" type="textarea" :rows="4" maxlength="200" show-word-limit
+                placeholder="补充说明(选填，选择「其他」时必填)" style="margin-top: 12px" />
+      <template #footer>
+        <el-button round @click="diaryReportVisible = false">取消</el-button>
+        <el-button round type="primary" :loading="diaryReporting" @click="submitDiaryReport">提交举报</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, EditPen } from '@element-plus/icons-vue'
-import { diaryApi } from '@/api'
+import { diaryApi, reportApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -221,6 +238,36 @@ const viewWriter = (u) => {
   writerVisible.value = true
 }
 
+// ===== 举报日记(分类白名单与信件举报一致，仅非作者本人的日记可举报) =====
+const REPORT_CATS = ['辱骂攻击', '色情低俗', '广告骚扰', '政治敏感', '违法信息', '其他']
+const diaryReportVisible = ref(false)
+const diaryReporting = ref(false)
+const currentReportDiary = ref(null)
+const diaryReportForm = reactive({ category: '', description: '' })
+const canReportDiary = (d) => !isGuest.value && String(d.userId) !== String(userStore.userId)
+const openDiaryReport = (d) => {
+  currentReportDiary.value = d
+  diaryReportForm.category = ''
+  diaryReportForm.description = ''
+  diaryReportVisible.value = true
+}
+const submitDiaryReport = async () => {
+  if (!diaryReportForm.category) return ElMessage.warning('请选择举报类型')
+  if (diaryReportForm.category === '其他' && !diaryReportForm.description.trim()) {
+    return ElMessage.warning('选择「其他」时请补充说明')
+  }
+  diaryReporting.value = true
+  try {
+    await reportApi.reportDiary({
+      diaryId: currentReportDiary.value.id,
+      category: diaryReportForm.category,
+      description: diaryReportForm.description.trim()
+    })
+    ElMessage.success('举报已提交，感谢你的反馈')
+    diaryReportVisible.value = false
+  } finally { diaryReporting.value = false }
+}
+
 watch(activeTab, load)
 onMounted(load)
 </script>
@@ -280,7 +327,33 @@ onMounted(load)
 .writer-diaries { display: flex; flex-direction: column; gap: 14px; }
 .writer-diary { border-bottom: 1px dashed var(--line); padding-bottom: 12px; }
 .writer-diary:last-child { border-bottom: none; padding-bottom: 0; }
+.writer-diary-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .writer-diary-meta { font-size: 11px; color: var(--ink-faint); margin-bottom: 6px; }
+.diary-report {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.diary-report:hover { color: #7a5c1e; text-decoration: underline; }
+
+/* 举报弹窗 */
+.report-cats { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-cats .chip {
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--soft-border, #e5dcc6);
+  cursor: pointer;
+  color: var(--ink-soft, #6b5d4d);
+  background: #fffdf6;
+}
+.report-cats .chip.on {
+  color: #fff;
+  background: var(--accent, #7a5c3e);
+  border-color: var(--accent, #7a5c3e);
+}
 .view-row { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 
 .timeline { display: flex; flex-direction: column; gap: 12px; }

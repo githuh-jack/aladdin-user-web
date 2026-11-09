@@ -81,14 +81,33 @@
 
       <footer class="web-footer">传信纸船 · 纸短情长，见字如面</footer>
     </template>
+
+    <!-- 处罚邮件必读弹窗(登录用户逐封确认，不可通过遮罩/ESC/关闭按钮关闭) -->
+    <el-dialog v-model="punishVisible" width="92%" style="max-width: 480px"
+               :show-close="false" :close-on-click-modal="false" :close-on-press-escape="false">
+      <template #header>
+        <div class="punish-head">
+          <span class="punish-title">📮 处罚通知</span>
+          <span v-if="punishQueue.length > 1" class="punish-progress">{{ punishIndex + 1 }} / {{ punishQueue.length }}</span>
+        </div>
+      </template>
+      <div v-if="currentPunish" class="punish-body">
+        <div class="punish-mail-title">{{ currentPunish.title || '处罚通知' }}</div>
+        <div class="punish-mail-content">{{ currentPunish.content }}</div>
+      </div>
+      <template #footer>
+        <el-button round type="primary" :loading="punishConfirming" @click="confirmPunish">我已知晓并接受</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { punishApi } from '@/api'
 import { THEMES, applyTheme, initTheme } from '@/utils/theme'
 
 const route = useRoute()
@@ -103,7 +122,6 @@ const navMenus = [
   { path: '/home', title: '首页' },
   { path: '/letters', title: '信件' },
   { path: '/diary', title: '日记' },
-  { path: '/notes', title: '话题' },
   { path: '/shop', title: '商店' }
 ]
 
@@ -113,7 +131,6 @@ const adminMenus = [
   { path: '/admin/mails', title: '系统邮件' },
   { path: '/admin/friends', title: '好友' },
   { path: '/admin/diary', title: '日记' },
-  { path: '/admin/notes', title: '话题' },
   { path: '/admin/avatars', title: '头像审核' },
   { path: '/admin/login-logs', title: '登录日志' },
   { path: '/admin/config', title: '系统配置' },
@@ -140,7 +157,7 @@ const onCommand = (cmd) => {
   if (cmd === 'profile') router.push('/profile')
   else if (cmd === 'logout') {
     userStore.logout()
-    // 退出后游客可看的页面(首页/日记/话题)原地停留为游客，其余回首页
+    // 退出后游客可看的页面(首页/日记)原地停留为游客，其余回首页
     const guestAllowed = !!(route.meta && (route.meta.public || route.meta.guest))
     if (!guestAllowed) router.push('/home')
   }
@@ -150,6 +167,64 @@ onMounted(async () => {
   if (userStore.token && !userStore.userId) {
     userStore.restoreFromStorage()
     await userStore.fetchUserInfo()
+  }
+  // 登录用户：检查待确认的处罚邮件
+  loadPunishPending()
+})
+
+// ===== 处罚邮件：登录必读弹窗 =====
+const punishQueue = ref([])       // 待确认处罚邮件队列
+const punishIndex = ref(0)        // 当前展示的队列下标
+const punishVisible = ref(false)
+const punishConfirming = ref(false)
+const currentPunish = computed(() => punishQueue.value[punishIndex.value] || null)
+
+// 拉取待确认处罚邮件(仅登录态；失败静默，401 等由拦截器统一处理，不打扰游客)
+const loadPunishPending = async () => {
+  if (!userStore.token) return
+  try {
+    const r = await punishApi.pending()
+    const list = r.data || []
+    if (list.length) {
+      punishQueue.value = list
+      punishIndex.value = 0
+      punishVisible.value = true
+    }
+  } catch (e) { /* 静默 */ }
+}
+
+// 确认当前处罚邮件(幂等)后弹下一封，全部确认完给出提示
+const confirmPunish = async () => {
+  const mail = currentPunish.value
+  if (!mail || punishConfirming.value) return
+  punishConfirming.value = true
+  try {
+    await punishApi.confirm(mail.userMailId)
+    if (punishIndex.value < punishQueue.value.length - 1) {
+      punishIndex.value += 1
+    } else {
+      punishVisible.value = false
+      punishQueue.value = []
+      punishIndex.value = 0
+      ElMessage.success('处罚通知已确认，禁闭期开始')
+    }
+  } catch (e) {
+    // 确认失败停留本封；若 401 已退登则关闭弹窗，避免游客被卡住
+    if (!userStore.token) {
+      punishVisible.value = false
+      punishQueue.value = []
+      punishIndex.value = 0
+    }
+  } finally { punishConfirming.value = false }
+}
+
+// 登录态变化：登录后重新检查处罚邮件，退出时清空弹窗
+watch(() => userStore.token, (t) => {
+  if (t) loadPunishPending()
+  else {
+    punishVisible.value = false
+    punishQueue.value = []
+    punishIndex.value = 0
   }
 })
 </script>
@@ -336,4 +411,31 @@ onMounted(async () => {
 }
 .admin-link.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .admin-main { flex: 1; padding: 20px 24px; }
+
+/* ---------- 处罚邮件必读弹窗 ---------- */
+.punish-head { display: flex; align-items: center; gap: 10px; }
+.punish-title {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--ink);
+}
+.punish-progress { font-size: 11px; color: var(--ink-faint); }
+.punish-body { padding: 4px 2px; }
+.punish-mail-title {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+.punish-mail-content {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 50vh;
+  overflow-y: auto;
+}
 </style>

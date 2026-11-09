@@ -29,9 +29,6 @@
       <div class="entry" @click="$router.push('/diary/write')">
         <span class="entry-icon">📖</span><span>日记</span>
       </div>
-      <div class="entry" @click="$router.push('/notes')">
-        <span class="entry-icon">📎</span><span>话题</span>
-      </div>
     </div>
 
     <!-- 信件广场(游客与登录用户均可浏览) -->

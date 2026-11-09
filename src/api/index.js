@@ -16,7 +16,7 @@ request.interceptors.request.use(config => {
   return config
 })
 
-// 登录态失效：清掉本地登录态；游客可看的页面(首页/日记/话题)原地转为游客继续浏览，其余才跳登录页
+// 登录态失效：清掉本地登录态；游客可看的页面(首页/日记)原地转为游客继续浏览，其余才跳登录页
 const handleUnauthorized = () => {
   const userStore = useUserStore()
   if (!userStore.token) return
@@ -94,6 +94,7 @@ export const letterApi = {
 // 举报
 export const reportApi = {
   reportLetter: (data) => request.post('/biz/report/letter', data),
+  reportDiary: (data) => request.post('/biz/report/diary', data),
   mine: () => request.get('/biz/report/mine')
 }
 
@@ -120,33 +121,12 @@ export const diaryApi = {
   remove: (id) => request.post(`/biz/diary/remove/${id}`)
 }
 
-// 其他笔记
-export const noteApi = {
-  list: (params) => request.get('/biz/note/list', { params }),
-  publicList: (params) => request.get('/biz/note/public', { params }),
-  detail: (id) => request.get(`/biz/note/detail/${id}`),
-  save: (data) => request.post('/biz/note', data),
-  update: (data) => request.post('/biz/note/edit', data),
-  remove: (id) => request.post(`/biz/note/remove/${id}`)
-}
-
-// 邮票
+// 郵票
 export const stampApi = {
   shopList: () => request.get('/biz/stamp/shop'),
   mine: () => request.get('/biz/stamp/mine'),
   detail: (id) => request.get(`/biz/stamp/detail/${id}`),
   collection: () => request.get('/biz/stamp/collection')
-}
-
-// 互动(点赞/收藏)
-export const interactApi = {
-  toggle: (data) => request.post('/biz/interact/toggle', data)
-}
-
-// 评论
-export const commentApi = {
-  list: (params) => request.get('/biz/comment/list', { params }),
-  add: (data) => request.post('/biz/comment', data)
 }
 
 // 信封
@@ -184,6 +164,18 @@ export const sysMailApi = {
   claim: (id) => request.post(`/biz/mail/claim/${id}`)
 }
 
+// 处罚邮件(登录后必读确认)
+export const punishApi = {
+  pending: () => request.get('/biz/mail/punish/pending'),
+  confirm: (userMailId) => request.post(`/biz/mail/punish/confirm/${userMailId}`)
+}
+
+// 每日签到
+export const checkinApi = {
+  status: () => request.get('/biz/checkin/status'),
+  submit: () => request.post('/biz/checkin/submit')
+}
+
 // 勋章
 export const medalApi = {
   my: () => request.get('/biz/medal/my')
@@ -208,7 +200,6 @@ export const adminApi = {
   avatarReview: (data) => request.post('/biz/profile/admin/review', data),
   friends: () => request.get('/biz/friend/admin/list'),
   diary: (params) => request.get('/biz/diary/admin/list', { params }),
-  notes: (params) => request.get('/biz/note/admin/list', { params }),
   stamps: () => request.get('/biz/stamp/admin/list'),
   stampAdd: (data) => request.post('/biz/stamp/admin/add', data),
   stampEdit: (data) => request.post('/biz/stamp/admin/edit', data),
